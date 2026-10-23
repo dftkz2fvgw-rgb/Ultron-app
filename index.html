@@ -34,6 +34,8 @@ body{height:100%;background:var(--void);color:var(--ink);font-family:var(--mono)
 .mic.on svg{stroke:var(--red)}
 .mic:focus-visible{outline:1px solid var(--red);outline-offset:4px}
 
+#cam{position:absolute;z-index:4;left:max(16px,env(safe-area-inset-left,0px));bottom:16px;width:92px;height:122px;object-fit:cover;border-radius:14px;border:1px solid var(--hair);transform:scaleX(-1);opacity:0;pointer-events:none;transition:opacity .4s}
+#cam.on{opacity:1}
 @media (prefers-reduced-motion:reduce){.orb,.mic{transition:none}}
 </style>
 
@@ -42,7 +44,7 @@ body{height:100%;background:var(--void);color:var(--ink);font-family:var(--mono)
   <canvas id="map" aria-label="Carte du monde"></canvas>
   <div class="fx"></div>
   <div id="probe"></div>
-  <video id="cam" playsinline muted autoplay style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"></video>
+  <video id="cam" playsinline muted autoplay></video>
   <div class="orb" id="orb" aria-hidden="true"><canvas id="orbc"></canvas></div>
   <button class="mic" id="mic" aria-label="Parler à Ultron" hidden><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21"/></svg></button>
 </div>
@@ -121,7 +123,7 @@ const insetL=()=>parseFloat(getComputedStyle(document.getElementById('probe')).p
 let userK=1;
 function orbPos(){if(mode==='map'){const k=.42*userK;return{x:W-Math.max(16,insetR())-128*k,y:H-16-128*k,k}}return{x:W/2,y:H*.42,k:userK}}
 function place(){const p=orbPos();orbBtn.style.transform=`translate(${p.x-130}px,${p.y-130}px) scale(${p.k})`;
-  const m=mode==='map'?{x:Math.max(16,insetL()),y:H-70-29}:{x:W/2-29,y:H*.42+170};micBtn.style.left=m.x+'px';micBtn.style.top=m.y+'px'}
+  const m=mode==='map'?{x:Math.max(16,insetL())+110,y:H-70-29}:{x:W/2-29,y:H*.42+170};micBtn.style.left=m.x+'px';micBtn.style.top=m.y+'px'}
 // taille normale : la carte entière, centrée, fixe
 const homeCam=()=>({x:0,y:(MAPT+MAPB)/2,s:sMin});
 function resize(){DPR=Math.min(2,devicePixelRatio||1);W=app.clientWidth;H=app.clientHeight;cv.width=W*DPR;cv.height=H*DPR;
@@ -228,7 +230,7 @@ micBtn.addEventListener('click',listen);
 // ───────── gestes du doigt
 const HELP_OLD="Glisse vers le haut pour ouvrir la carte, vers le bas pour la fermer. Pince sur moi pour m'agrandir ou me rétrécir, pince sur la carte pour zoomer, double-tape pour revenir à la taille normale. Glisse à gauche ou à droite pour changer de ville. Dessine un cercle pour me saluer, garde le doigt appuyé pour l'état du système.";
 function wake(){if(awake)return false;awake=true;say("Salut Yaniss. Ultron en ligne. Touche l'écran avec deux doigts pour connaître mes gestes.");return true}
-const HELP="Avec ta main : paume ouverte vers le haut pour ouvrir la carte, vers le bas pour la fermer, à gauche ou à droite pour changer de ville. Pince le pouce et l'index pour m'agrandir ou zoomer. Deux doigts pour pointer une ville. Poing fermé pour revenir à la taille normale. Garde la paume immobile pour me saluer.";
+const HELP="Ouvre la main pour afficher la carte et zoomer : plus tu écartes les doigts, plus j'agrandis. Déplace ta main pour bouger la carte. Ferme le poing pour revenir à la taille normale. Dis ferme la carte pour la cacher.";
 const G={
   tap(p){const o=orbPos();if(Math.hypot(p.x-o.x,p.y-o.y)<110*o.k){if(!started)startAll();else if(!micOn)listen();return}
     if(mode!=='map'){wake();return}let best=null,bd=26;for(const c of cities){const[sx,sy]=toS(c.x,c.y),d=Math.hypot(sx-p.x,sy-p.y);if(d<bd){bd=d;best=c}}if(best)target(best)},
@@ -273,37 +275,25 @@ function startMic(){if(!SR)return;rec=new SR();rec.lang='fr-FR';rec.continuous=t
   rec.onerror=e=>{if(/not-allowed|service-not-allowed/.test(e.error))micOn=false};
   rec.onend=()=>{listening=false;if(micOn)setTimeout(()=>{try{rec.start()}catch(_){}},250)};
   micOn=true;try{rec.start()}catch(_){}}
-function startAll(){started=true;awake=true;say("Salut Yaniss. Ultron en ligne. Active la caméra, et montre-moi ta main.");startMic();
+function startAll(){started=true;awake=true;say("Salut Yaniss. Ultron en ligne. Autorise la caméra, puis ouvre la main.");startMic();
   const tryCam=()=>window.ULcam?window.ULcam():setTimeout(tryCam,300);tryCam()}
 
-// ───────── gestes de la main (caméra)
-const HG={hand:null,seen:0,cand:'none',candN:0,g:'none',since:0,ref:null,hist:[],cool:0,held:false,cur:null,dwell:null};
+// ───────── gestes de la main (caméra) : main ouverte = zoom, poing = taille normale, déplacer la main = déplacer la carte
+const HG={hand:null,o:0,last:null,openSince:0,fistSince:0,seen:0};
 const D=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
-function classifyHand(l){const w=l[0],ext=i=>D(w,l[i])>D(w,l[i-2])*1.1,ix=ext(8),md=ext(12),rg=ext(16),pk=ext(20);
-  if(ix&&md&&rg&&pk)return'open';if(!ix&&!md&&!rg&&!pk)return'fist';if(ix&&md&&!rg&&!pk)return'point';if(ix&&!md&&!rg&&!pk)return'pinch';return'none'}
-const toScreen=p=>({x:((1-p.x)-.18)/.64*W,y:(p.y-.12)/.66*H});
-function setGesture(g,now){if(HG.g==='pinch'&&g!=='pinch')orbBtn.style.transition='';HG.g=g;HG.since=now;HG.held=false;HG.hist=[];HG.dwell=null;
-  if(g==='pinch'&&HG.hand){const l=HG.hand;HG.ref={r:D(l[4],l[8])/D(l[0],l[9]),k:userK,s:cam.s};orbBtn.style.transition='none'}}
-function onHands(l){const now=performance.now();HG.hand=l;if(!l){if(now-HG.seen>400&&HG.g!=='none')setGesture('none',now);return}HG.seen=now;
-  const c=classifyHand(l);if(c===HG.cand)HG.candN++;else{HG.cand=c;HG.candN=1}if(HG.candN>=4&&c!==HG.g)setGesture(c,now);
-  const g=HG.g,size=D(l[0],l[9]);
-  if(g==='pinch'&&HG.ref){const f=Math.max(.3,Math.min(3.5,(D(l[4],l[8])/size)/HG.ref.r));
-    if(mode==='map'){const ts=HG.ref.s*f;zoomAt(W/2,H/2,Math.pow(ts/cam.s,.25))}else{userK+=(Math.max(.45,Math.min(1.7,HG.ref.k*f))-userK)*.3;place()}}
-  if(g==='open'){const p={x:1-l[9].x,y:l[9].y,t:now};HG.hist.push(p);while(HG.hist.length&&now-HG.hist[0].t>380)HG.hist.shift();
-    const a=HG.hist[0],dx=p.x-a.x,dy=p.y-a.y;
-    if(now>HG.cool&&HG.hist.length>3){if(Math.abs(dx)>.2&&Math.abs(dx)>Math.abs(dy)*1.4){HG.cool=now+1100;HG.hist=[];HG.held=true;G.side(dx>0?1:-1);return}
-      if(Math.abs(dy)>.18&&Math.abs(dy)>Math.abs(dx)*1.4){HG.cool=now+1100;HG.hist=[];HG.held=true;dy<0?G.up():G.down();return}}
-    if(!HG.held&&now-HG.since>1600&&now>HG.cool){HG.held=true;G.circle()}}
-  if(g==='fist'&&!HG.held&&now-HG.since>900){HG.held=true;userK=1;place();if(mode==='map'){sel=null;resetZoom()}say("Taille normale.")}
-  if(g==='point'){const s=toScreen(l[8]);HG.cur=HG.cur?{x:HG.cur.x+(s.x-HG.cur.x)*.35,y:HG.cur.y+(s.y-HG.cur.y)*.35}:s;
-    if(mode==='map'){let best=null,bd=34;for(const c2 of cities){const[sx,sy]=toS(c2.x,c2.y),d=Math.hypot(sx-HG.cur.x,sy-HG.cur.y);if(d<bd){bd=d;best=c2}}
-      if(best&&best!==sel){if(!HG.dwell||HG.dwell.c!==best)HG.dwell={c:best,t:now};else if(now-HG.dwell.t>1100){target(best);HG.dwell=null}}else HG.dwell=null}}}
-const BONES=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[0,17],[17,18],[18,19],[19,20]];
-function drawHand(t){const l=HG.hand;if(!l||t-HG.seen>300)return;const P=l.map(toScreen);cx.save();cx.strokeStyle='rgba(255,60,75,.22)';cx.lineWidth=1;cx.beginPath();for(const[a,b]of BONES){cx.moveTo(P[a].x,P[a].y);cx.lineTo(P[b].x,P[b].y)}cx.stroke();
-  cx.fillStyle='rgba(255,90,100,.45)';for(const p of P){cx.beginPath();cx.arc(p.x,p.y,2,0,7);cx.fill()}
-  if(HG.g==='point'&&HG.cur){const{x,y}=HG.cur;cx.strokeStyle='#ff2a3d';cx.lineWidth=1.5;cx.beginPath();cx.arc(x,y,10,0,7);cx.stroke();
-    if(HG.dwell){const k=Math.min(1,(t-HG.dwell.t)/1100);cx.lineWidth=3;cx.beginPath();cx.arc(x,y,15,-Math.PI/2,-Math.PI/2+k*Math.PI*2);cx.stroke()}}cx.restore()}
-window.UL={hands:onHands,camReady:()=>say("Caméra active. Je vois tes mains."),camFail:()=>say("Je n'ai pas accès à la caméra. Autorise-la dans les réglages de Safari.")};
+function openness(l){const s=D(l[0],l[9])||1e-3,avg=[8,12,16,20].reduce((a,i)=>a+D(l[0],l[i])/s,0)/4,spread=D(l[4],l[20])/s;
+  return Math.max(0,Math.min(1,((avg-1.15)/.75)*.7+((spread-.9)/1.0)*.3))}
+function onHands(l){const now=performance.now();HG.hand=l;if(!l){HG.last=null;HG.openSince=0;HG.fistSince=0;return}HG.seen=now;
+  HG.o+=(openness(l)-HG.o)*.35;const palm={x:1-(l[0].x+l[9].x)/2,y:(l[0].y+l[9].y)/2};
+  if(mode!=='map'){if(HG.o>.7){if(!HG.openSince)HG.openSince=now;else if(now-HG.openSince>700){HG.openSince=0;awake=true;openMap()}}else HG.openSince=0;HG.last=palm;return}
+  anim=null;
+  if(HG.o<.2){if(!HG.fistSince)HG.fistSince=now;if(now-HG.fistSince>200){zoomAt(W/2,H/2,Math.pow(sMin/cam.s,.2));const h=homeCam();cam.x+=(h.x-cam.x)*.2;cam.y+=(h.y-cam.y)*.2;clampCam()}HG.last=palm;return}
+  HG.fistSince=0;
+  const ts=sMin*(1+4*Math.pow(Math.min(1,(HG.o-.2)/.8),1.2));zoomAt(W/2,H/2,Math.pow(ts/cam.s,.15));
+  if(HG.last){const dx=palm.x-HG.last.x,dy=palm.y-HG.last.y;if(Math.hypot(dx,dy)>.003){cam.x-=dx*W*1.6/cam.s;cam.y-=dy*H*1.3/cam.s;clampCam()}}
+  HG.last=palm}
+function drawHand(){}
+window.UL={hands:onHands,camReady:()=>{document.getElementById('cam').classList.add('on');say("Caméra active. Ouvre la main pour afficher la carte.")},camFail:()=>say("Je n'ai pas accès à la caméra. Autorise-la dans les réglages de Safari.")};
 
 function loop(t){
   if(anim){const k=Math.min(1,(t-anim.t0)/anim.d),e=1-Math.pow(1-k,3);cam.x=anim.f.x+(anim.t.x-anim.f.x)*e;cam.y=anim.f.y+(anim.t.y-anim.f.y)*e;cam.s=Math.exp(Math.log(anim.f.s)+(Math.log(anim.t.s)-Math.log(anim.f.s))*e);if(k>=1){anim=null;clampCam()}}
