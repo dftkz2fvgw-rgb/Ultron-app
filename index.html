@@ -19,8 +19,9 @@ html,body{height:100%;margin:0;background:var(--void);color:var(--ink);font-fami
 .fx{position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 85% at 50% 45%,transparent 55%,rgba(0,0,0,.8) 100%)}
 .orb{position:absolute;left:0;top:0;width:260px;height:260px;pointer-events:none;transform-origin:50% 50%;transition:transform 1.25s cubic-bezier(.7,0,.2,1);z-index:3}
 .orb canvas{width:260px;height:260px;display:block}
-#cam{position:absolute;z-index:5;left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(66px + env(safe-area-inset-bottom,0px));width:88px;height:116px;object-fit:cover;border-radius:14px;border:1px solid var(--hair);transform:scaleX(-1);opacity:0;transition:opacity .4s;pointer-events:none;background:#000}
-#cam.on{opacity:1}
+#cam{position:absolute;z-index:5;left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(66px + env(safe-area-inset-bottom,0px));width:88px;height:116px;object-fit:cover;border-radius:14px;border:1px solid var(--hair);transform:scaleX(-1);pointer-events:none;background:#000}
+.camst{position:absolute;z-index:6;left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(66px + env(safe-area-inset-bottom,0px));width:88px;height:116px;display:grid;place-items:center;text-align:center;padding:8px;font:500 9px/1.4 var(--mono);letter-spacing:.12em;color:var(--dim);text-transform:uppercase;pointer-events:none}
+.camst[hidden]{display:none}
 .convo{position:absolute;z-index:5;left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:9px;padding:10px 15px;border-radius:22px;border:1px solid var(--hair);background:var(--glass);color:var(--dim);font:500 11px var(--mono);letter-spacing:.18em;text-transform:uppercase;cursor:pointer;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .convo i{width:7px;height:7px;border-radius:50%;background:var(--dim)}
 .convo.on{color:var(--ink);border-color:rgba(255,42,61,.5)}
@@ -52,6 +53,7 @@ html,body{height:100%;margin:0;background:var(--void);color:var(--ink);font-fami
   <div class="fx"></div>
   <div class="orb" id="orb"><canvas id="orbc"></canvas></div>
   <video id="cam" playsinline muted autoplay></video>
+  <div class="camst" id="camst">Caméra…</div>
   <div class="convo" id="convo"><i></i>Conversation</div>
   <div class="card" id="card"><img id="cimg" alt="" hidden><div class="b"><span class="k" id="ck"></span><h2 id="cn"></h2><p id="cd"></p></div></div>
   <div class="modal" id="modal" hidden><div class="in">
@@ -267,7 +269,11 @@ function onHands(l){const now=performance.now();if(!l){HG.last=null;HG.fistSince
   // la carte suit la main
   if(HG.last){const dx=palm.x-HG.last.x,dy=palm.y-HG.last.y;if(Math.hypot(dx,dy)>.003){const g=1+zEff*7;tv.lon-=dx*220/g;tv.lat+=dy*160/g}}
   HG.last=palm}
-async function startCam(){const v=$('cam');try{const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:false});v.srcObject=st;await v.play();v.classList.add('on')}catch(e){say("Je n'ai pas accès à la caméra. Autorise-la dans les réglages de Safari.");return}
+let camOn=false;
+async function startCam(){if(camOn)return;const v=$('cam'),st=$('camst');st.hidden=false;st.textContent='Caméra…';
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){st.textContent='Ouvre dans Safari';return}
+  try{const s2=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:false});v.srcObject=s2;v.muted=true;v.setAttribute('playsinline','');await v.play().catch(()=>{});camOn=true;st.hidden=true}
+  catch(e){st.textContent=/NotAllowed|Permission/i.test(e.name+e.message)?'Touche pour autoriser':'Caméra indisponible';return}
   try{const V=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');const fs=await V.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
     const opts=d=>({baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',delegate:d},runningMode:'VIDEO',numHands:1});
     let lm;try{lm=await V.HandLandmarker.createFromOptions(fs,opts('GPU'))}catch(e){lm=await V.HandLandmarker.createFromOptions(fs,opts('CPU'))}
@@ -284,12 +290,13 @@ app.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const o=
   else if(ptrs.size===2&&pz){const[a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y);z=Math.max(0,Math.min(1,z+Math.log(d/pz.d)*.7));pz.d=d}});
 const up=e=>{if(!ptrs.has(e.pointerId))return;ptrs.delete(e.pointerId);if(ptrs.size<2)pz=null;if(moved||e.type==='pointercancel')return;
   const p=pos(e),n=performance.now();if(n-lastTap<300&&mode==='map'){lastTap=0;resetView();return}lastTap=n;
-  const o=orbPos();if(Math.hypot(p.x-o.x,p.y-o.y)<110*o.k){if(!started)start();else micToggle()}};
+  if(!started){start();return}if(!camOn)startCam();const o=orbPos();if(Math.hypot(p.x-o.x,p.y-o.y)<110*o.k)micToggle()};
 app.addEventListener('pointerup',up);app.addEventListener('pointercancel',up);
 convoEl.addEventListener('pointerdown',e=>{e.stopPropagation();lpT=setTimeout(()=>{lpT='done';askKey()},700)});
 convoEl.addEventListener('pointerup',e=>{e.stopPropagation();if(lpT==='done'){lpT=null;return}clearTimeout(lpT);lpT=null;if(!started)start();else micToggle()});
 
 function start(){started=true;say("Salut Yaniss. Ultron en ligne.");micOn=!!SR;setConvo();setTimeout(recStart,2500);startCam()}
+startCam();
 
 // ───────── boucle
 function resize(){W=innerWidth;H=innerHeight;oc.width=260*DPR;oc.height=260*DPR;ox.setTransform(DPR,0,0,DPR,0,0);place();if(G){G.renderer.setSize(W,H);G.camera.aspect=W/H;G.camera.updateProjectionMatrix()}}
