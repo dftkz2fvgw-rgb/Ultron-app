@@ -89,10 +89,13 @@ html,body{height:100%;margin:0;background:var(--void);color:var(--ink);font-fami
   <div class="convo" id="convo"><i></i><span>Conversation</span></div>
   <div class="card" id="card"><img id="cimg" alt="" hidden><div class="b"><span class="k" id="ck"></span><h2 id="cn"></h2><p id="cd"></p></div></div>
   <div class="modal" id="modal" hidden><div class="in">
-    <h3>CLÉ CLAUDE</h3>
-    <p>Pour converser librement avec Ultron, collez votre clé API Claude (elle commence par sk-ant-). Elle reste uniquement sur ce téléphone.</p>
+    <h3>CLÉS D'ULTRON</h3>
+    <p><b>Écoute</b> : clé Groq gratuite (console.groq.com → API Keys, elle commence par gsk_). Une clé OpenAI marche aussi.</p>
+    <input id="sttin" type="password" placeholder="gsk_…" autocomplete="off">
+    <p><b>Conversation</b> : clé Claude (commence par sk-ant-).</p>
     <input id="keyin" type="password" placeholder="sk-ant-…" autocomplete="off">
-    <div class="row"><button id="kno">Annuler</button><button class="go" id="kok">Enregistrer</button></div>
+    <p>Elles restent uniquement sur ce téléphone.</p>
+    <div class="row"><button id="kno">Plus tard</button><button class="go" id="kok">Enregistrer</button></div>
   </div></div>
 </div>
 <script type="module">
@@ -148,14 +151,49 @@ function say(txt){if(!txt)return;const id=++sayId;speaking=true;recPause();let e
   const wd=setInterval(()=>{const el=performance.now()-t0;if(el>maxT||(el>700&&!('speechSynthesis'in window&&(speechSynthesis.speaking||speechSynthesis.pending))))done()},300);
   if('speechSynthesis'in window){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(txt);u.lang='fr-FR';if(vox)u.voice=vox;u.pitch=.62;u.rate=1.02;u.onend=u.onerror=done;speechSynthesis.speak(u)}catch(e){done()}}else setTimeout(done,txt.length*60)}
 
+// ───────── écoute par enregistrement + transcription Whisper (Groq ou OpenAI) : marche partout, même depuis l'écran d'accueil
+const STT={stream:null,ctx:null,an:null,buf:null,rec:null,chunks:[],state:'idle',speechMs:0,silMs:0,voiced:0,floor:.008,startT:0,busy:false,timer:null};
+function sttKey(){try{const k=localStorage.getItem('ultron_stt');if(k)return k;for(let i=0;i<localStorage.length;i++){const v=localStorage.getItem(localStorage.key(i))||'';const m=v.match(/gsk_[A-Za-z0-9]{20,}/);if(m)return m[0]}}catch(e){}return null}
+async function sttInit(){if(STT.stream)return true;if(STT.initing)return false;STT.initing=true;
+  try{STT.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}})}
+  catch(e){STT.initing=false;micHelp("Autorisez le micro pour Ultron. Réglages, Safari, Micro, Autoriser.");return false}
+  const AC=window.AudioContext||window.webkitAudioContext;STT.ctx=new AC();const src=STT.ctx.createMediaStreamSource(STT.stream);STT.an=STT.ctx.createAnalyser();STT.an.fftSize=1024;src.connect(STT.an);STT.buf=new Float32Array(STT.an.fftSize);
+  STT.timer=setInterval(sttTick,50);STT.initing=false;if(STT.ctx.state!=='running'){needTap=true;setConvo()}else showHeard('🎙 À l\'écoute…',false);return true}
+function sttRms(){STT.an.getFloatTimeDomainData(STT.buf);let s=0;for(let i=0;i<STT.buf.length;i++)s+=STT.buf[i]*STT.buf[i];return Math.sqrt(s/STT.buf.length)}
+function sttTick(){if(!micOn||speaking||thinking||document.hidden||STT.busy||needTap){if(STT.state==='rec')sttStop(false);return}
+  if(STT.ctx.state!=='running'){needTap=true;setConvo();return}
+  const r=sttRms();convoEl.classList.add('live');
+  if(STT.state==='idle'){STT.floor=STT.floor*.98+Math.min(r,.04)*.02;if(r>Math.max(.012,STT.floor*3)){STT.speechMs+=50;if(STT.speechMs>=100)sttBegin()}else STT.speechMs=0}
+  else{if(r<Math.max(.009,STT.floor*2.2))STT.silMs+=50;else{STT.silMs=0;STT.voiced+=50;listening=true}
+    if(STT.silMs>=900||performance.now()-STT.startT>15000)sttStop(true)}}
+function sttBegin(){const mime=['audio/mp4','audio/webm;codecs=opus','audio/webm'].find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(m))||'';
+  try{STT.rec=mime?new MediaRecorder(STT.stream,{mimeType:mime}):new MediaRecorder(STT.stream)}catch(e){micHelp("L'enregistrement audio n'est pas pris en charge ici.");return}
+  STT.chunks=[];STT.mime=STT.rec.mimeType||mime||'audio/mp4';STT.rec.ondataavailable=e=>{if(e.data&&e.data.size)STT.chunks.push(e.data)};
+  STT.rec.start();STT.state='rec';STT.startT=performance.now();STT.silMs=0;STT.voiced=0;listening=true;showHeard('🎙 …',false)}
+function sttStop(send){const r=STT.rec;STT.state='idle';STT.speechMs=0;listening=false;if(!r)return;STT.rec=null;const voiced=STT.voiced;
+  r.onstop=()=>{if(send&&voiced>=300)sttSend(new Blob(STT.chunks,{type:STT.mime}))};try{r.stop()}catch(e){}}
+const HALLU=/amara|sous-titr|merci d'avoir regard|abonnez[- ]vous|^\W*(merci|bye|\.+|…)\W*$/i;
+async function sttSend(blob){const key=sttKey();if(!key)return;STT.busy=true;showHeard('🎙 Je réfléchis à ce que vous avez dit…',false);
+  const groq=key.startsWith('gsk_'),url=groq?'https://api.groq.com/openai/v1/audio/transcriptions':'https://api.openai.com/v1/audio/transcriptions';
+  const ext=/webm/.test(blob.type)?'webm':/ogg/.test(blob.type)?'ogg':'m4a';
+  const fd=new FormData();fd.append('file',blob,'voix.'+ext);fd.append('model',groq?'whisper-large-v3-turbo':'whisper-1');fd.append('language','fr');fd.append('temperature','0');fd.append('response_format','json');
+  fd.append('prompt','Ultron, ouvre la carte, ferme la carte, hologramme, corps, Monsieur, Tokyo, Paris.');
+  try{const r=await fetch(url,{method:'POST',headers:{Authorization:'Bearer '+key},body:fd});
+    if(r.status===401){try{localStorage.removeItem('ultron_stt')}catch(e){}micHelp("La clé de transcription n'est pas valide, Monsieur.");askKey();return}
+    if(!r.ok){showHeard('⚠ Transcription impossible (erreur '+r.status+')',true);return}
+    const j=await r.json(),txt=(j.text||'').trim();if(!txt||HALLU.test(txt)){heardEl.classList.remove('show');return}
+    showHeard(txt,true);hear(txt)}
+  catch(e){showHeard('⚠ Pas de connexion pour la transcription',true)}
+  finally{STT.busy=false}}
+
 // ───────── conversation : écoute courte et relancée en boucle (bien plus fiable sur iPhone que le mode continu)
 const convoEl=$('convo'),heardEl=$('heard');let micOn=false,rec=null,thinking=false,history=[],needTap=false,lastRecEvt=0,heardT=null;
 const setConvo=()=>{convoEl.classList.toggle('on',micOn&&!needTap);convoEl.classList.toggle('think',thinking);convoEl.lastChild.textContent=needTap?'Touchez pour écouter':'Conversation'};
 function showHeard(txt,final){heardEl.textContent=txt;heardEl.classList.add('show');heardEl.classList.toggle('final',!!final);clearTimeout(heardT);heardT=setTimeout(()=>heardEl.classList.remove('show'),final?2200:4000)}
-function recStart(){if(!micOn||speaking||thinking||rec||!SR||document.hidden)return;
+function recStart(){if(sttKey()){if(micOn&&!STT.stream)sttInit();return}if(!micOn||speaking||thinking||rec||!SR||document.hidden)return;
   let best='',finalSent=false,silenceT=null;const r=new SR();rec=r;r.lang='fr-FR';r.continuous=false;r.interimResults=true;r.maxAlternatives=1;
   const finish=()=>{if(finalSent)return;finalSent=true;clearTimeout(silenceT);const txt=best.trim();try{r.abort()}catch(e){}if(rec===r)rec=null;listening=false;if(txt.length>1){showHeard(txt,true);hear(txt)}else setTimeout(recStart,150)};
-  r.onstart=()=>{lastRecEvt=performance.now();needTap=false;setConvo();convoEl.classList.add('live')};
+  r.onstart=()=>{lastRecEvt=performance.now();needTap=false;setConvo();convoEl.classList.add('live');if(!heardEl.classList.contains('show'))showHeard('🎙 À l\'écoute…',false)};
   r.onresult=e=>{lastRecEvt=performance.now();let txt='',isFinal=false;for(let i=0;i<e.results.length;i++){txt+=e.results[i][0].transcript;if(e.results[i].isFinal)isFinal=true}
     best=txt;listening=true;showHeard(txt,false);clearTimeout(silenceT);if(isFinal)finish();else silenceT=setTimeout(finish,1100)};
   r.onerror=e=>{lastRecEvt=performance.now();const er=e.error||'';
@@ -165,43 +203,57 @@ function recStart(){if(!micOn||speaking||thinking||rec||!SR||document.hidden)ret
     else if(er==='network')micHelp("La dictée a besoin d'internet. Vérifiez votre connexion.")};
   r.onend=()=>{if(rec===r)rec=null;listening=false;if(best&&!finalSent){finish();return}if(!finalSent&&micOn&&!needTap)setTimeout(recStart,120)};
   try{r.start()}catch(e){rec=null;setTimeout(recStart,500)}}
-function recPause(){convoEl.classList.remove('live');const r=rec;rec=null;listening=false;try{r&&r.abort()}catch(e){}}
+function recPause(){convoEl.classList.remove('live');if(STT.state==='rec')sttStop(false);const r=rec;rec=null;listening=false;try{r&&r.abort()}catch(e){}}
 let helpSaid={};function micHelp(m){showHeard('⚠ '+m,true);if(!helpSaid[m]){helpSaid[m]=1;setTimeout(()=>say(m.replace(/:/g,',')),400)}}
-if(!SR)setTimeout(()=>micHelp("Ce navigateur ne permet pas la reconnaissance vocale. Ouvrez Ultron dans Safari."),1500);
+if(!SR&&!sttKey())setTimeout(()=>micHelp("Ce navigateur ne permet pas la reconnaissance vocale. Ouvrez Ultron dans Safari."),1500);
 // chien de garde : relance l'écoute si elle s'est arrêtée toute seule
 setInterval(()=>{if(!micOn||speaking||thinking||needTap||document.hidden)return;if(!rec)recStart();else if(performance.now()-lastRecEvt>12000){recPause();recStart()}},1500);
-function micToggle(){if(!SR){say("La reconnaissance vocale n'est pas disponible ici, Monsieur. Ouvrez Ultron dans Safari.");return}
+function micToggle(){if(!SR&&!sttKey()){askKey();return}if(false){say("La reconnaissance vocale n'est pas disponible ici, Monsieur. Ouvrez Ultron dans Safari.");return}
   if(needTap){needTap=false;micOn=true;setConvo();recStart();return}micOn=!micOn;userMicOff=!micOn;setConvo();if(micOn)recStart();else recPause()}
-function findKey(){try{const k=localStorage.getItem('ultron_key');if(k)return k;for(let i=0;i<localStorage.length;i++){const v=localStorage.getItem(localStorage.key(i))||'';const m=v.match(/sk-ant-[A-Za-z0-9_\-]{20,}/);if(m)return m[0]}}catch(e){}return null}
-const modal=$('modal'),keyin=$('keyin');
-function askKey(){modal.hidden=false;keyin.value='';setTimeout(()=>keyin.focus(),50)}
+function findKey(){try{const k=localStorage.getItem('ultron_key');if(k)return k.trim();if(localStorage.getItem('ultron_key_bad'))return null;for(let i=0;i<localStorage.length;i++){const v=localStorage.getItem(localStorage.key(i))||'';const m=v.match(/sk-ant-[A-Za-z0-9_\-]{20,}/);if(m)return m[0]}}catch(e){}return null}
+const modal=$('modal'),keyin=$('keyin'),sttin=$('sttin');
+function askKey(){modal.hidden=false;keyin.value='';sttin.value='';sttin.placeholder=sttKey()?'••••  enregistrée':'gsk_…';keyin.placeholder=findKey()?'••••  enregistrée':'sk-ant-…';setTimeout(()=>(sttKey()?keyin:sttin).focus(),50)}
 $('kno').onclick=()=>{modal.hidden=true};
-$('kok').onclick=()=>{const v=keyin.value.trim();if(!/^sk-ant-/.test(v)){keyin.style.borderColor='var(--red)';return}try{localStorage.setItem('ultron_key',v)}catch(e){}modal.hidden=true;say("Clé enregistrée. Je vous écoute, Monsieur.")};
+$('kok').onclick=()=>{try{localStorage.removeItem('ultron_key_bad')}catch(e){}goodModel=null;const v=keyin.value.trim(),w=sttin.value.trim();let bad=false;
+  if(w){if(/^(gsk_|sk-)/.test(w)&&!/^sk-ant-/.test(w)){try{localStorage.setItem('ultron_stt',w)}catch(e){}}else{sttin.style.borderColor='var(--red)';bad=true}}
+  if(v){if(/^sk-ant-/.test(v)){try{localStorage.setItem('ultron_key',v)}catch(e){}}else{keyin.style.borderColor='var(--red)';bad=true}}
+  if(bad)return;modal.hidden=true;micOn=true;needTap=false;setConvo();recStart();say("Clés enregistrées. Je vous écoute, Monsieur.")};
 modal.addEventListener('pointerdown',e=>e.stopPropagation());
 const SYS=()=>`Tu es ULTRON, l'intelligence artificielle personnelle de ton créateur, que tu appelles toujours « Monsieur » et que tu vouvoies. Tu parles comme l'Ultron des films : voix posée, phrases élégantes et un peu théâtrales, une pointe d'ironie froide et de grandeur, mais une loyauté absolue envers Monsieur. Nous sommes le ${new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}, il est ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}.
 Tes réponses sont lues à voix haute : réponds en français comme dans une vraie conversation orale entre deux personnes : naturel, fluide, une à trois phrases courtes, sans markdown, sans liste, sans emoji. Si Monsieur pose une question de suivi, garde le fil de la conversation.
 ${bodySummary()}
 Tu contrôles un globe terrestre en 3D et un hologramme biométrique de Monsieur (s'il veut le voir, ajoute [CORPS]). Si Monsieur veut voir la carte, ajoute [CARTE] à la fin. S'il veut la fermer, ajoute [FERMER]. S'il veut voir une capitale ou un pays, ajoute [LIEU:nom de la capitale en français].`;
+const MODELS=['claude-haiku-5-5','claude-sonnet-5-5','claude-haiku-4-5','claude-sonnet-4-5'];let goodModel=null;
 async function askClaude(text){const key=findKey();if(!key){say("Pour converser librement, Monsieur, j'ai besoin de votre clé Claude.");askKey();return}
-  history.push({role:'user',content:text});history=history.slice(-12);if(history[0].role!=='user')history.shift();
-  thinking=true;setConvo();recPause();
-  try{let r;for(const model of['claude-haiku-5-5','claude-sonnet-5-5']){r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:220,system:SYS(),messages:history})});if(r.status!==404)break}
+  history.push({role:'user',content:text});history=history.slice(-12);while(history.length&&history[0].role!=='user')history.shift();
+  thinking=true;setConvo();recPause();showHeard('… Ultron réfléchit',false);
+  const fail=(m,spoken)=>{history.pop();thinking=false;setConvo();showHeard('⚠ '+m,true);say(spoken)};
+  try{let r=null,err=null;
+    for(const model of(goodModel?[goodModel]:MODELS)){const ac=new AbortController(),to=setTimeout(()=>ac.abort(),25000);
+      try{r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',signal:ac.signal,headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:220,system:SYS(),messages:history})})}finally{clearTimeout(to)}
+      if(r.ok){goodModel=model;break}
+      err=await r.json().catch(()=>({}));const msg=(err.error&&err.error.message)||'';
+      if(!(r.status===404||(r.status===400&&/model/i.test(msg))))break}
+    if(!r.ok){const msg=(err&&err.error&&err.error.message)||('erreur '+r.status);
+      if(r.status===401){try{localStorage.setItem('ultron_key_bad','1');localStorage.removeItem('ultron_key')}catch(e){}return fail('Clé Claude refusée : '+msg,"Votre clé Claude est refusée, Monsieur. Appuyez longuement sur Conversation pour en mettre une autre.")}
+      if(r.status===400&&/credit|balance|billing/i.test(msg))return fail('Crédit Claude épuisé : '+msg,"Votre crédit Claude est épuisé, Monsieur. Rechargez-le sur la console d'Anthropic.");
+      if(r.status===403)return fail('Accès refusé : '+msg,"Cette clé n'a pas accès à l'API, Monsieur.");
+      if(r.status===429)return fail('Trop de demandes : '+msg,"Trop de demandes d'un coup, Monsieur. Patientez quelques secondes.");
+      if(r.status>=500)return fail('Claude surchargé : '+msg,"Les serveurs de Claude sont surchargés, Monsieur. Réessayez dans un instant.");
+      return fail('Claude : '+msg,"Une erreur s'est produite, Monsieur. Le détail est affiché à l'écran.")}
+    const j=await r.json();const t=(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join(' ').trim();history.push({role:'assistant',content:t||'…'});
     thinking=false;setConvo();
-    if(r.status===401){history.pop();say("Votre clé Claude n'est pas valide, Monsieur.");try{localStorage.removeItem('ultron_key')}catch(e){}askKey();return}
-    if(!r.ok){history.pop();say("Mes circuits ne répondent pas pour le moment, Monsieur.");return}
-    const j=await r.json();let t=(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join(' ').trim();history.push({role:'assistant',content:t||'…'});
     if(/\[CARTE\]/i.test(t))openMap();if(/\[FERMER\]/i.test(t)){closeMap();closeBody()}if(/\[CORPS\]/i.test(t))openBody();
     const m=t.match(/\[LIEU:\s*([^\]]+)\]/i);if(m){const c=findCap(norm(m[1]));if(c)goCap(c)}
-    say(t.replace(/\[[^\]]*\]/g,'').trim())}
-  catch(e){thinking=false;setConvo();history.pop();say("Connexion perdue, Monsieur. Réessayez.")}}
+    const spoken=t.replace(/\[[^\]]*\]/g,'').trim();if(spoken)say(spoken);else setTimeout(recStart,200)}
+  catch(e){fail(e.name==='AbortError'?'Claude ne répond pas (délai dépassé)':'Connexion à Claude impossible : '+e.message,e.name==='AbortError'?"Claude met trop de temps à répondre, Monsieur.":"Je n'arrive pas à joindre Claude, Monsieur. Vérifiez la connexion.")}}
 const findCap=t=>CAPS.find(c=>t.includes(norm(c.n))||t.includes(norm(c.c)));
 const WAKE=/\b(ultron|ultrons|ultra|ultrone|hultron|ul tron|eltron|altron|oultron|ultrom)\b/i;let attentiveUntil=0;
 const attentive=()=>performance.now()<attentiveUntil;
 function hear(raw){const plain=raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   if(WAKE.test(plain)){const rest=raw.replace(/\b(hey|eh|ok|dis|salut|bonjour)?\s*(ultron|ultrons|ultra|ultrone|hultron|ul tron|eltron|altron|oultron|ultrom)\b[\s,.!?]*/i,' ').trim();
     attentiveUntil=performance.now()+12000;if(rest.replace(/[^a-zà-ÿ0-9]/gi,'').length<2){say(["Oui, Monsieur ?","Je vous écoute, Monsieur.","À votre service, Monsieur."][Math.floor(Math.random()*3)]);return}handle(rest);return}
-  if(attentive()||mode==='map'&&false){handle(raw);return}
-  showHeard('Dites « Ultron » pour me parler',false)}
+  handle(raw)}
 function handle(raw){const t=norm(raw);if(!t.trim())return;attentiveUntil=performance.now()+15000;
   if(/ (ferme|cache|quitte|enleve|retire|desactive|eteins)/.test(t)&&/ (carte|globe|monde|terre|corps|hologramme|tout|ca|la) /.test(t)){
     if(mode==='map'){closeMap();return say("Globe désactivé, Monsieur.")}if(mode==='body'){closeBody();return say("Hologramme désactivé, Monsieur.")}}
@@ -445,17 +497,18 @@ app.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const o=
   else if(ptrs.size===2&&pz){const[a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y);z=Math.max(0,Math.min(1,z+Math.log(d/pz.d)*.7));pz.d=d}});
 const up=e=>{if(!ptrs.has(e.pointerId))return;ptrs.delete(e.pointerId);if(ptrs.size<2)pz=null;if(moved||e.type==='pointercancel')return;
   const p=pos(e),n=performance.now();if(n-lastTap<300&&(mode==='map'||mode==='body')){lastTap=0;if(mode==='map')resetView();else{byaw=0;bz=0;btilt=0}return}lastTap=n;
+  if(STT.ctx&&STT.ctx.state!=='running'){STT.ctx.resume().then(()=>{needTap=false;setConvo();showHeard('🎙 À l\'écoute…',false)})}
   if(!started){start();return}if(!camOn)startCam();if(needTap||(!micOn&&!userMicOff&&SR)){needTap=false;micOn=true;setConvo();recStart();return}const o=orbPos();if(Math.hypot(p.x-o.x,p.y-o.y)<110*o.k)micToggle()};
 app.addEventListener('pointerup',up);app.addEventListener('pointercancel',up);
 convoEl.addEventListener('pointerdown',e=>{e.stopPropagation();lpT=setTimeout(()=>{lpT='done';askKey()},700)});
 convoEl.addEventListener('pointerup',e=>{e.stopPropagation();if(lpT==='done'){lpT=null;return}clearTimeout(lpT);lpT=null;if(!started)start();else micToggle()});
 
-function start(){started=true;say("Bonjour Monsieur. Tous mes systèmes sont en ligne.");micOn=!!SR;setConvo();setTimeout(recStart,2500);startCam()}
+function start(){started=true;setTimeout(()=>{if(SR&&!rec&&!needTap)showHeard('🎙 Démarrage du micro…',false)},800);say("Bonjour Monsieur. Tous mes systèmes sont en ligne.");micOn=!!SR;setConvo();setTimeout(recStart,2500);startCam()}
 start();
 
 // ───────── appli fermée : micro et caméra coupés
 let micWasOn=false;
-function sleepAll(){micWasOn=micOn;micOn=false;recPause();setConvo();try{speechSynthesis.cancel()}catch(e){}speaking=false;
+function sleepAll(){if(STT.state==='rec')sttStop(false);micWasOn=micOn;micOn=false;recPause();setConvo();try{speechSynthesis.cancel()}catch(e){}speaking=false;
   if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null}camOn=false;const v=$('cam');v.srcObject=null;const st=$('camst');st.hidden=false;st.textContent='Caméra en pause'}
 function wakeAll(){startCam();if(micWasOn||!userMicOff){micOn=true;setConvo();setTimeout(recStart,600)}}
 document.addEventListener('visibilitychange',()=>{document.hidden?sleepAll():wakeAll()});
