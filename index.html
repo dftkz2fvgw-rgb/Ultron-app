@@ -77,10 +77,10 @@ for(let i=0;i<N;i++){const y=1-2*(i+.5)/N,r=Math.sqrt(1-y*y),th=GA*i;base.push([
   const a=i/N*Math.PI*2*7%(Math.PI*2),rr=1.05+(rnd()-.5)*.32;ringT.push([Math.cos(a)*rr,Math.sin(a)*rr,(rnd()-.5)*.35])}
 for(let i=0;i<N;i++){const d=[];for(let j=0;j<N;j++)if(j!==i){const a=base[i],b=base[j];d.push([(a[0]-b[0])**2+(a[1]-b[1])**2+(a[2]-b[2])**2,j])}d.sort((a,b)=>a[0]-b[0]);for(let k=0;k<3;k++)if(d[k][1]>i)pairs.push(i,d[k][1])}
 const ND=[];for(let k=0;k<5;k++){const u=rnd()*2-1,a=rnd()*Math.PI*2,s=Math.sqrt(1-u*u);ND.push([Math.cos(a)*s,u,Math.sin(a)*s,2+rnd()*3,.6+rnd()*1.4])}
-let speaking=false,listening=false,lvl=0,morph=0;const P=new Float32Array(N*3);
+let speaking=false,listening=false,lvl=0,morph=0,orbAng=0,orbVel=0,orbTilt=0,orbK=1,orbKt=1,userMicOff=false;const P=new Float32Array(N*3);
 function drawOrb(t){const S=260,c=130,ts=t/1000;
   const tg=speaking?.55+.45*Math.abs(Math.sin(t/85)*Math.sin(t/211)):listening?.35+.25*Math.abs(Math.sin(t/140)):.0;lvl+=(tg-lvl)*.15;morph+=((listening?1:0)-morph)*.06;
-  const amp=.05+lvl*.32,rotY=reduce?0:ts*.35,tilt=.35,cy=Math.cos(rotY),sy=Math.sin(rotY),ct=Math.cos(tilt),st=Math.sin(tilt),Rad=78+lvl*14;
+  const amp=.05+lvl*.32,rotY=(reduce?0:ts*.35)+orbAng,tilt=.35+orbTilt,cy=Math.cos(rotY),sy=Math.sin(rotY),ct=Math.cos(tilt),st=Math.sin(tilt),Rad=78+lvl*14;
   for(let i=0;i<N;i++){const b=base[i];let n=0;for(const d of ND)n+=Math.sin((b[0]*d[0]+b[1]*d[1]+b[2]*d[2])*d[3]+ts*d[4]*(1+lvl*4));n/=ND.length;
     const k=1+amp*n*2,rg=ringT[i],rk=1+amp*n*1.4;
     const bx=b[0]*k,by=b[1]*k,bz=b[2]*k,x1=bx*cy+bz*sy,z1=-bx*sy+bz*cy,y1=by*ct-z1*st,z2=by*st+z1*ct;
@@ -121,7 +121,7 @@ function recStart(){if(!micOn||speaking||rec||!SR)return;try{rec=new SR();rec.la
   rec.onerror=e=>{if(/not-allowed|service-not-allowed/.test(e.error)){micOn=false;setConvo()}};
   rec.onend=()=>{listening=false;rec=null;if(micOn&&!speaking)setTimeout(recStart,250)};rec.start()}catch(e){rec=null}}
 function recPause(){const r=rec;rec=null;listening=false;try{r&&r.abort()}catch(e){}}
-function micToggle(){if(!SR){say("La reconnaissance vocale n'est pas disponible ici. Ouvre Ultron dans Safari.");return}micOn=!micOn;setConvo();if(micOn)recStart();else recPause()}
+function micToggle(){if(!SR){say("La reconnaissance vocale n'est pas disponible ici. Ouvre Ultron dans Safari.");return}micOn=!micOn;userMicOff=!micOn;setConvo();if(micOn)recStart();else recPause()}
 function findKey(){try{const k=localStorage.getItem('ultron_key');if(k)return k;for(let i=0;i<localStorage.length;i++){const v=localStorage.getItem(localStorage.key(i))||'';const m=v.match(/sk-ant-[A-Za-z0-9_\-]{20,}/);if(m)return m[0]}}catch(e){}return null}
 const modal=$('modal'),keyin=$('keyin');
 function askKey(){modal.hidden=false;keyin.value='';setTimeout(()=>keyin.focus(),50)}
@@ -230,6 +230,7 @@ function renderGlobe(t){if(!G)return;
   if(reveal){const k=Math.min(1,(t-reveal.t0)/reveal.d),e=reveal.dir>0?1-Math.pow(1-k,3):1-k*k*k,r=e*Math.hypot(W,H);globeEl.style.clipPath=`circle(${r}px at ${reveal.x}px ${reveal.y}px)`;
     if(k>=1){if(reveal.dir<0){mode='idle';place();labelsEl.querySelectorAll('.lbl').forEach(l=>l.hidden=true)}else globeEl.style.clipPath='none';reveal=null}}
   if(mode==='idle')return;
+  tv.lon+=spinV;spinV*=.92;if(Math.abs(spinV)<.01)spinV=0;
   if(mode==='map'&&z<.05&&t-lastInput>2500&&!reduce)tv.lon+=.035;
   tv.lat=Math.max(-75,Math.min(75,tv.lat));
   let dl=((tv.lon-view.lon+540)%360)-180;view.lon+=dl*.14;view.lat+=(tv.lat-view.lat)*.14;zEff+=(z-zEff)*.1;
@@ -256,24 +257,33 @@ function hideCard(){if(!cardCap)return;cardCap=null;card.classList.remove('show'
 const HG={o:0,base:0,armed:false,last:null,fistSince:0,openSince:0,didReset:false};
 const Dd=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 function openness(l){const s=Dd(l[0],l[9])||1e-3,avg=[8,12,16,20].reduce((a,i)=>a+Dd(l[0],l[i])/s,0)/4,spread=Dd(l[4],l[20])/s;return Math.max(0,Math.min(1,((avg-1.15)/.75)*.7+((spread-.9)/1.0)*.3))}
+let spinV=0;
 function onHands(l){const now=performance.now();if(!l){HG.last=null;HG.fistSince=0;HG.openSince=0;return}
   HG.o+=(openness(l)-HG.o)*.4;const o=HG.o,palm={x:1-(l[0].x+l[9].x)/2,y:(l[0].y+l[9].y)/2};
-  if(mode!=='map'){if(mode==='idle'&&o>.7){if(!HG.openSince)HG.openSince=now;else if(now-HG.openSince>700){HG.openSince=0;openMap();say("Voici le monde.")}}else HG.openSince=0;HG.last=palm;return}
+  const dx=HG.last?palm.x-HG.last.x:0,dy=HG.last?palm.y-HG.last.y:0,sp=Math.hypot(dx,dy);HG.last=palm;
+  if(sp>.007)HG.moveUntil=now+300;const moving=now<(HG.moveUntil||0);
+  if(mode!=='map'){ // orbe seul : la main le fait tourner, main ouverte immobile = carte
+    if(sp>.003){orbAng+=dx*6;orbVel=dx*3;orbTilt=Math.max(-1.2,Math.min(1.2,orbTilt+dy*4))}
+    if(o<.18){if(!HG.fistSince)HG.fistSince=now;else if(now-HG.fistSince>450&&!HG.didReset){HG.didReset=true;HG.armed=false;orbKt=1;orbTilt=0;orbVel=0}HG.base=o;HG.openSince=0;return}
+    HG.fistSince=0;HG.didReset=false;
+    if(moving||!HG.armed){HG.base=o;if(!HG.armed&&o>.65&&!moving)HG.armed=true}
+    else{if(o<HG.base)HG.base=o;else if(o>HG.base+.06){orbKt=Math.min(1.7,orbKt+(o-HG.base)*.6);HG.base=o}}
+    if(mode==='idle'&&o>.7&&!moving){if(!HG.openSince)HG.openSince=now;else if(now-HG.openSince>1400){HG.openSince=0;HG.armed=false;openMap();say("Voici le monde.")}}else HG.openSince=0;return}
   lastInput=now;
   // poing fermé : retour à la vue d'origine
-  if(o<.18){if(!HG.fistSince)HG.fistSince=now;else if(now-HG.fistSince>450&&!HG.didReset){HG.didReset=true;HG.armed=false;resetView()}HG.last=palm;HG.base=o;return}
+  if(o<.18){if(!HG.fistSince)HG.fistSince=now;else if(now-HG.fistSince>450&&!HG.didReset){HG.didReset=true;HG.armed=false;resetView();spinV=0;orbTilt=0;orbVel=0}HG.base=o;return}
   HG.fistSince=0;HG.didReset=false;
-  // zoom à cliquet : chaque ouverture agrandit, refermer à moitié ne dézoome pas
-  if(!HG.armed){HG.base=o;if(o>.65)HG.armed=true}
-  else{if(o<HG.base)HG.base=o;else if(o>HG.base+.05){z=Math.min(1,z+(o-HG.base)*.75);HG.base=o}}
-  // la carte suit la main
-  if(HG.last){const dx=palm.x-HG.last.x,dy=palm.y-HG.last.y;if(Math.hypot(dx,dy)>.003){const g=1+zEff*7;tv.lon-=dx*220/g;tv.lat+=dy*160/g}}
-  HG.last=palm}
-let camOn=false;
+  // le globe tourne dans le sens de la main (avec élan)
+  if(sp>.003){const g=1+zEff*7;tv.lon-=dx*240/g;tv.lat+=dy*160/g;spinV=-dx*120/g;orbAng+=dx*6;orbVel=dx*3;orbTilt=Math.max(-1.2,Math.min(1.2,orbTilt+dy*4))}
+  // zoom à cliquet : seulement quand la main ne se déplace pas
+  if(moving||!HG.armed){HG.base=o;if(!HG.armed&&o>.65&&!moving)HG.armed=true}
+  else{if(o<HG.base)HG.base=o;else if(o>HG.base+.06){z=Math.min(1,z+(o-HG.base)*.75);HG.base=o}}}
+let camOn=false,camStream=null,handsInit=false;
 async function startCam(){if(camOn)return;const v=$('cam'),st=$('camst');st.hidden=false;st.textContent='Caméra…';
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){st.textContent='Ouvre dans Safari';return}
-  try{const s2=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:false});v.srcObject=s2;v.muted=true;v.setAttribute('playsinline','');await v.play().catch(()=>{});camOn=true;st.hidden=true}
+  try{const s2=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:false});camStream=s2;v.srcObject=s2;v.muted=true;v.setAttribute('playsinline','');await v.play().catch(()=>{});camOn=true;st.hidden=true}
   catch(e){st.textContent=/NotAllowed|Permission/i.test(e.name+e.message)?'Touche pour autoriser':'Caméra indisponible';return}
+  if(handsInit)return;handsInit=true;
   try{const V=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');const fs=await V.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
     const opts=d=>({baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',delegate:d},runningMode:'VIDEO',numHands:1});
     let lm;try{lm=await V.HandLandmarker.createFromOptions(fs,opts('GPU'))}catch(e){lm=await V.HandLandmarker.createFromOptions(fs,opts('CPU'))}
@@ -290,16 +300,23 @@ app.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const o=
   else if(ptrs.size===2&&pz){const[a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y);z=Math.max(0,Math.min(1,z+Math.log(d/pz.d)*.7));pz.d=d}});
 const up=e=>{if(!ptrs.has(e.pointerId))return;ptrs.delete(e.pointerId);if(ptrs.size<2)pz=null;if(moved||e.type==='pointercancel')return;
   const p=pos(e),n=performance.now();if(n-lastTap<300&&mode==='map'){lastTap=0;resetView();return}lastTap=n;
-  if(!started){start();return}if(!camOn)startCam();const o=orbPos();if(Math.hypot(p.x-o.x,p.y-o.y)<110*o.k)micToggle()};
+  if(!started){start();return}if(!camOn)startCam();if(!micOn&&!userMicOff&&SR){micOn=true;setConvo();recStart()}const o=orbPos();if(Math.hypot(p.x-o.x,p.y-o.y)<110*o.k)micToggle()};
 app.addEventListener('pointerup',up);app.addEventListener('pointercancel',up);
 convoEl.addEventListener('pointerdown',e=>{e.stopPropagation();lpT=setTimeout(()=>{lpT='done';askKey()},700)});
 convoEl.addEventListener('pointerup',e=>{e.stopPropagation();if(lpT==='done'){lpT=null;return}clearTimeout(lpT);lpT=null;if(!started)start();else micToggle()});
 
 function start(){started=true;say("Salut Yaniss. Ultron en ligne.");micOn=!!SR;setConvo();setTimeout(recStart,2500);startCam()}
-startCam();
+start();
 
+// ───────── appli fermée : micro et caméra coupés
+let micWasOn=false;
+function sleepAll(){micWasOn=micOn;micOn=false;recPause();setConvo();try{speechSynthesis.cancel()}catch(e){}speaking=false;
+  if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null}camOn=false;const v=$('cam');v.srcObject=null;const st=$('camst');st.hidden=false;st.textContent='Caméra en pause'}
+function wakeAll(){startCam();if(micWasOn||!userMicOff){micOn=true;setConvo();setTimeout(recStart,600)}}
+document.addEventListener('visibilitychange',()=>{document.hidden?sleepAll():wakeAll()});
+addEventListener('pagehide',sleepAll);addEventListener('pageshow',e=>{if(e.persisted)wakeAll()});
 // ───────── boucle
 function resize(){W=innerWidth;H=innerHeight;oc.width=260*DPR;oc.height=260*DPR;ox.setTransform(DPR,0,0,DPR,0,0);place();if(G){G.renderer.setSize(W,H);G.camera.aspect=W/H;G.camera.updateProjectionMatrix()}}
 addEventListener('resize',resize);resize();
-function loop(t){renderGlobe(t);drawOrb(t);requestAnimationFrame(loop)}requestAnimationFrame(loop);
+function loop(t){orbAng+=orbVel;orbVel*=.94;orbK+=((mode==='idle'?orbKt:1)-orbK)*.12;oc.style.transform=`scale(${orbK.toFixed(3)})`;renderGlobe(t);drawOrb(t);requestAnimationFrame(loop)}requestAnimationFrame(loop);
 </script></body></html>
