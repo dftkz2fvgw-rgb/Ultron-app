@@ -1,56 +1,164 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="ULTRON"><meta name="theme-color" content="#030406">
+<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="ULTRON"><meta name="theme-color" content="#030406">
 <title>ULTRON</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}*{box-sizing:border-box}body{margin:0}[hidden]{display:none!important}
-/* Layout : écran noir, orbe de particules seule au centre ; sur commande la carte du monde, fixe, jaillit de l'orbe qui se range en bas à droite. Micro en bas. */
-:root{
-  --void:#030406;
-  --ink:#eef1f6;
-  --dim:#7f8798;
-  --red:#ff2a3d;
-  --hair:rgba(255,255,255,.14);
-  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
-  color-scheme:dark;
-}
-html{height:100%;box-sizing:border-box;background:var(--void)}
-body{height:100%;background:var(--void);color:var(--ink);font-family:var(--mono);overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
-#app{position:relative;height:100%;overflow:hidden}
-#map{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
-.fx{position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 85% at 50% 45%,transparent 50%,rgba(0,0,0,.85) 100%)}
-#probe{position:absolute;width:0;height:0;padding-right:env(safe-area-inset-right,0px);padding-left:env(safe-area-inset-left,0px);visibility:hidden}
-
-.orb{position:absolute;left:0;top:0;pointer-events:none;width:260px;height:260px;padding:0;border:0;background:none;cursor:pointer;border-radius:50%;
-  transform-origin:50% 50%;transition:transform 1.25s cubic-bezier(.7,0,.2,1);z-index:3}
+/* ULTRON : orbe seul sur fond noir ; la Terre en 3D jaillit de l'orbe ; caméra et « Conversation » en bas à gauche */
+:root{--void:#030406;--ink:#eef1f6;--dim:#7f8798;--red:#ff2a3d;--hair:rgba(255,255,255,.14);--glass:rgba(10,12,17,.8);
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;--display:"Chakra Petch",system-ui,sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--void);color:var(--ink);font-family:var(--mono);overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+#app{position:fixed;inset:0;touch-action:none}
+#globe{position:absolute;inset:0;clip-path:circle(0px at 50% 50%)}
+#globe canvas{display:block;width:100%;height:100%}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;left:0;top:0;font-size:10px;letter-spacing:.1em;color:rgba(238,241,246,.85);white-space:nowrap;text-shadow:0 0 6px #000,0 0 2px #000;text-transform:uppercase}
+.fx{position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 85% at 50% 45%,transparent 55%,rgba(0,0,0,.8) 100%)}
+.orb{position:absolute;left:0;top:0;width:260px;height:260px;pointer-events:none;transform-origin:50% 50%;transition:transform 1.25s cubic-bezier(.7,0,.2,1);z-index:3}
 .orb canvas{width:260px;height:260px;display:block}
-
-.mic{position:absolute;z-index:4;width:58px;height:58px;border-radius:50%;border:1px solid var(--hair);background:rgba(10,12,16,.6);
-  display:grid;place-items:center;cursor:pointer;transition:left 1.25s cubic-bezier(.7,0,.2,1),top 1.25s cubic-bezier(.7,0,.2,1),border-color .2s,box-shadow .2s;
-  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
-.mic svg{width:24px;height:24px;stroke:var(--ink);fill:none;stroke-width:1.6;stroke-linecap:round}
-.mic.on{border-color:var(--red);box-shadow:0 0 0 6px rgba(255,42,61,.12),0 0 24px rgba(255,42,61,.5)}
-.mic.on svg{stroke:var(--red)}
-.mic:focus-visible{outline:1px solid var(--red);outline-offset:4px}
-
-#cam{position:absolute;z-index:4;left:max(16px,env(safe-area-inset-left,0px));bottom:16px;width:92px;height:122px;object-fit:cover;border-radius:14px;border:1px solid var(--hair);transform:scaleX(-1);opacity:0;pointer-events:none;transition:opacity .4s}
+#cam{position:absolute;z-index:5;left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(66px + env(safe-area-inset-bottom,0px));width:88px;height:116px;object-fit:cover;border-radius:14px;border:1px solid var(--hair);transform:scaleX(-1);opacity:0;transition:opacity .4s;pointer-events:none;background:#000}
 #cam.on{opacity:1}
-@media (prefers-reduced-motion:reduce){.orb,.mic{transition:none}}
-</style>
-
-</head><body>
+.convo{position:absolute;z-index:5;left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:9px;padding:10px 15px;border-radius:22px;border:1px solid var(--hair);background:var(--glass);color:var(--dim);font:500 11px var(--mono);letter-spacing:.18em;text-transform:uppercase;cursor:pointer;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.convo i{width:7px;height:7px;border-radius:50%;background:var(--dim)}
+.convo.on{color:var(--ink);border-color:rgba(255,42,61,.5)}
+.convo.on i{background:var(--red);box-shadow:0 0 8px var(--red);animation:blink 1.4s infinite}
+.convo.think i{background:#ffb35c;box-shadow:0 0 8px #ffb35c}
+@keyframes blink{50%{opacity:.3}}
+.card{position:absolute;z-index:6;top:calc(16px + env(safe-area-inset-top,0px));left:50%;width:min(360px,calc(100% - 32px));transform:translate(-50%,-14px);opacity:0;transition:opacity .35s,transform .35s;
+  background:var(--glass);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid var(--hair);border-top:2px solid var(--red);border-radius:16px;overflow:hidden;pointer-events:none}
+.card.show{opacity:1;transform:translate(-50%,0)}
+.card img{display:block;width:100%;height:160px;object-fit:cover;background:#0b0d12}
+.card img[hidden]{display:none}
+.card .b{padding:12px 14px 14px;display:flex;flex-direction:column;gap:3px}
+.card .k{font-size:9px;letter-spacing:.22em;color:var(--red);text-transform:uppercase}
+.card h2{margin:0;font:600 22px var(--display);letter-spacing:.04em}
+.card p{margin:6px 0 0;font:400 12px/1.55 var(--mono);color:#c9ced8;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
+.modal{position:absolute;inset:0;z-index:9;display:grid;place-items:center;background:rgba(0,0,0,.6);padding:16px}
+.modal[hidden]{display:none}
+.modal .in{width:min(360px,100%);background:#0c0e13;border:1px solid var(--hair);border-top:2px solid var(--red);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.modal h3{margin:0;font:600 18px var(--display);letter-spacing:.06em}
+.modal p{margin:0;font-size:12px;line-height:1.5;color:#b9bfca}
+.modal input{font:400 14px var(--mono);color:var(--ink);background:#05070a;border:1px solid var(--hair);border-radius:10px;padding:11px 12px;width:100%;-webkit-user-select:text;user-select:text}
+.modal .row{display:flex;gap:8px;justify-content:flex-end}
+.modal button{font:600 12px var(--mono);letter-spacing:.12em;padding:10px 14px;border-radius:10px;border:1px solid var(--hair);background:none;color:var(--ink);cursor:pointer}
+.modal button.go{background:var(--red);border-color:var(--red);color:#120204}
+@media (prefers-reduced-motion:reduce){.orb{transition:none}}
+</style></head><body>
 <div id="app">
-  <canvas id="map" aria-label="Carte du monde"></canvas>
+  <div id="globe"><div id="labels"></div></div>
   <div class="fx"></div>
-  <div id="probe"></div>
+  <div class="orb" id="orb"><canvas id="orbc"></canvas></div>
   <video id="cam" playsinline muted autoplay></video>
-  <div class="orb" id="orb" aria-hidden="true"><canvas id="orbc"></canvas></div>
-  <button class="mic" id="mic" aria-label="Parler à Ultron" hidden><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21"/></svg></button>
+  <div class="convo" id="convo"><i></i>Conversation</div>
+  <div class="card" id="card"><img id="cimg" alt="" hidden><div class="b"><span class="k" id="ck"></span><h2 id="cn"></h2><p id="cd"></p></div></div>
+  <div class="modal" id="modal" hidden><div class="in">
+    <h3>CLÉ CLAUDE</h3>
+    <p>Pour parler librement avec Ultron, colle ta clé API Claude (elle commence par sk-ant-). Elle reste uniquement sur ce téléphone.</p>
+    <input id="keyin" type="password" placeholder="sk-ant-…" autocomplete="off">
+    <div class="row"><button id="kno">Annuler</button><button class="go" id="kok">Enregistrer</button></div>
+  </div></div>
 </div>
+<script type="module">
+const $=id=>document.getElementById(id);
+const app=$('app'),orbEl=$('orb'),oc=$('orbc'),ox=oc.getContext('2d'),globeEl=$('globe'),labelsEl=$('labels');
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+let W=innerWidth,H=innerHeight,DPR=Math.min(2,devicePixelRatio||1),mode='idle',started=false;
+const R=Math.PI/180;
 
-<script>
-(()=>{
+// ───────── orbe de particules (sphère → anneau quand tu parles)
+const N=620,base=[],ringT=[],pairs=[];let seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+const GA=Math.PI*(3-Math.sqrt(5));
+for(let i=0;i<N;i++){const y=1-2*(i+.5)/N,r=Math.sqrt(1-y*y),th=GA*i;base.push([Math.cos(th)*r+(rnd()-.5)*.06,y+(rnd()-.5)*.06,Math.sin(th)*r+(rnd()-.5)*.06]);
+  const a=i/N*Math.PI*2*7%(Math.PI*2),rr=1.05+(rnd()-.5)*.32;ringT.push([Math.cos(a)*rr,Math.sin(a)*rr,(rnd()-.5)*.35])}
+for(let i=0;i<N;i++){const d=[];for(let j=0;j<N;j++)if(j!==i){const a=base[i],b=base[j];d.push([(a[0]-b[0])**2+(a[1]-b[1])**2+(a[2]-b[2])**2,j])}d.sort((a,b)=>a[0]-b[0]);for(let k=0;k<3;k++)if(d[k][1]>i)pairs.push(i,d[k][1])}
+const ND=[];for(let k=0;k<5;k++){const u=rnd()*2-1,a=rnd()*Math.PI*2,s=Math.sqrt(1-u*u);ND.push([Math.cos(a)*s,u,Math.sin(a)*s,2+rnd()*3,.6+rnd()*1.4])}
+let speaking=false,listening=false,lvl=0,morph=0;const P=new Float32Array(N*3);
+function drawOrb(t){const S=260,c=130,ts=t/1000;
+  const tg=speaking?.55+.45*Math.abs(Math.sin(t/85)*Math.sin(t/211)):listening?.35+.25*Math.abs(Math.sin(t/140)):.0;lvl+=(tg-lvl)*.15;morph+=((listening?1:0)-morph)*.06;
+  const amp=.05+lvl*.32,rotY=reduce?0:ts*.35,tilt=.35,cy=Math.cos(rotY),sy=Math.sin(rotY),ct=Math.cos(tilt),st=Math.sin(tilt),Rad=78+lvl*14;
+  for(let i=0;i<N;i++){const b=base[i];let n=0;for(const d of ND)n+=Math.sin((b[0]*d[0]+b[1]*d[1]+b[2]*d[2])*d[3]+ts*d[4]*(1+lvl*4));n/=ND.length;
+    const k=1+amp*n*2,rg=ringT[i],rk=1+amp*n*1.4;
+    const bx=b[0]*k,by=b[1]*k,bz=b[2]*k,x1=bx*cy+bz*sy,z1=-bx*sy+bz*cy,y1=by*ct-z1*st,z2=by*st+z1*ct;
+    const ra=reduce?0:ts*.6,cr=Math.cos(ra),sr=Math.sin(ra),rx=(rg[0]*cr-rg[1]*sr)*rk,ry=(rg[0]*sr+rg[1]*cr)*rk,rz=rg[2];
+    const x=x1+(rx-x1)*morph,y=y1+(ry-y1)*morph,z=z2+(rz-z2)*morph;
+    const f=3.2/(3.2+z);P[i*3]=c+x*Rad*f;P[i*3+1]=c+y*Rad*f;P[i*3+2]=z}
+  ox.clearRect(0,0,S,S);ox.globalCompositeOperation='source-over';
+  const g=ox.createRadialGradient(c,c,8,c,c,130);g.addColorStop(0,`rgba(255,40,60,${.18+lvl*.25})`);g.addColorStop(.55,`rgba(255,40,60,${.05+lvl*.08})`);g.addColorStop(1,'rgba(255,40,60,0)');ox.fillStyle=g;ox.fillRect(0,0,S,S);
+  ox.globalCompositeOperation='lighter';
+  const L=[new Path2D(),new Path2D(),new Path2D()];
+  for(let k=0;k<pairs.length;k+=2){const a=pairs[k]*3,b=pairs[k+1]*3,z=(P[a+2]+P[b+2])/2,bi=z<-.3?0:z<.3?1:2;L[bi].moveTo(P[a],P[a+1]);L[bi].lineTo(P[b],P[b+1])}
+  ox.lineWidth=.6;[.5,.28,.12].forEach((al,i)=>{ox.strokeStyle=`rgba(255,70,80,${al*(.7+lvl*.6)*(1-morph*.6)})`;ox.stroke(L[i])});
+  for(let i=0;i<N;i++){const z=P[i*3+2],d=(1.3-z)/2.6,s=.6+d*1.5;ox.fillStyle=d>.62?`rgba(255,${170+lvl*60|0},${170+lvl*40|0},${.9})`:`rgba(255,55,70,${.25+d*.7})`;ox.fillRect(P[i*3]-s/2,P[i*3+1]-s/2,s,s)}
+  ox.globalCompositeOperation='source-over'}
+
+
+
+// ───────── capitales
+const CAPS=[["Paris","France",48.857,2.352],["Londres","Royaume-Uni",51.507,-0.128],["Berlin","Allemagne",52.52,13.405],["Madrid","Espagne",40.417,-3.704],["Rome","Italie",41.903,12.496],["Lisbonne","Portugal",38.722,-9.139],["Bruxelles","Belgique",50.85,4.352],["Amsterdam","Pays-Bas",52.37,4.895],["Berne","Suisse",46.948,7.447],["Vienne","Autriche",48.208,16.373,"Vienne (Autriche)"],["Varsovie","Pologne",52.23,21.012],["Prague","Tchéquie",50.075,14.438],["Budapest","Hongrie",47.498,19.04],["Athènes","Grèce",37.984,23.728],["Stockholm","Suède",59.329,18.069],["Oslo","Norvège",59.914,10.752],["Copenhague","Danemark",55.676,12.568],["Helsinki","Finlande",60.17,24.94],["Dublin","Irlande",53.35,-6.26],["Reykjavik","Islande",64.146,-21.94],["Moscou","Russie",55.756,37.617],["Kiev","Ukraine",50.45,30.524],["Ankara","Turquie",39.934,32.86],["Le Caire","Égypte",30.044,31.236],["Rabat","Maroc",34.02,-6.84],["Alger","Algérie",36.75,3.06],["Tunis","Tunisie",36.806,10.181],["Dakar","Sénégal",14.716,-17.467],["Bamako","Mali",12.639,-8.003],["Accra","Ghana",5.603,-0.187],["Abuja","Nigeria",9.076,7.398],["Kinshasa","RD Congo",-4.322,15.307],["Nairobi","Kenya",-1.292,36.822],["Addis-Abeba","Éthiopie",9.03,38.74],["Pretoria","Afrique du Sud",-25.747,28.229],["Antananarivo","Madagascar",-18.879,47.507],["Riyad","Arabie saoudite",24.713,46.675],["Abou Dabi","Émirats arabes unis",24.453,54.377],["Doha","Qatar",25.285,51.531],["Téhéran","Iran",35.689,51.389],["Bagdad","Irak",33.315,44.366],["Beyrouth","Liban",33.894,35.502],["Amman","Jordanie",31.945,35.928],["Kaboul","Afghanistan",34.555,69.207],["Islamabad","Pakistan",33.684,73.048],["New Delhi","Inde",28.614,77.209],["Dacca","Bangladesh",23.81,90.41],["Pékin","Chine",39.904,116.407],["Oulan-Bator","Mongolie",47.886,106.906],["Séoul","Corée du Sud",37.566,126.978],["Tokyo","Japon",35.676,139.65],["Bangkok","Thaïlande",13.756,100.502],["Hanoï","Viêt Nam",21.028,105.854],["Kuala Lumpur","Malaisie",3.139,101.687],["Singapour","Singapour",1.352,103.82],["Jakarta","Indonésie",-6.208,106.846],["Manille","Philippines",14.6,120.984],["Canberra","Australie",-35.281,149.13],["Wellington","Nouvelle-Zélande",-41.286,174.776],["Washington","États-Unis",38.907,-77.037,"Washington (district de Columbia)"],["Ottawa","Canada",45.421,-75.697],["Mexico","Mexique",19.433,-99.133],["La Havane","Cuba",23.113,-82.366],["Bogota","Colombie",4.711,-74.072],["Caracas","Venezuela",10.48,-66.904],["Quito","Équateur",-0.18,-78.468],["Lima","Pérou",-12.046,-77.043],["Brasilia","Brésil",-15.794,-47.882],["Santiago","Chili",-33.449,-70.669,"Santiago (Chili)"],["Buenos Aires","Argentine",-34.604,-58.382],["Montevideo","Uruguay",-34.901,-56.165]]
+  .map(([n,c,la,lo,w])=>({n,c,la,lo,w:w||n}));
+const norm=s=>' '+s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,' ')+' ';
+const angDist=(a,b,c,d)=>{const h=Math.sin((c-a)*R/2)**2+Math.cos(a*R)*Math.cos(c*R)*Math.sin((d-b)*R/2)**2;return 2*Math.asin(Math.min(1,Math.sqrt(h)))/R};
+
+// ───────── voix d'Ultron
+let vox=null;const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+function pickVoice(){if(!('speechSynthesis'in window))return;const v=speechSynthesis.getVoices().filter(v=>/^fr/i.test(v.lang));vox=v.find(v=>/thomas/i.test(v.name))||v.find(v=>/male|homme|daniel|nicolas/i.test(v.name))||v[0]||null}
+if('speechSynthesis'in window){pickVoice();speechSynthesis.onvoiceschanged=pickVoice}
+function say(txt){if(!txt)return;speaking=true;recPause();const fb=setTimeout(done,Math.max(1500,txt.length*70));
+  function done(){speaking=false;clearTimeout(fb);setTimeout(recStart,300)}
+  if('speechSynthesis'in window){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(txt);u.lang='fr-FR';if(vox)u.voice=vox;u.pitch=.7;u.rate=1;u.onstart=()=>{speaking=true;clearTimeout(fb)};u.onend=u.onerror=done;speechSynthesis.speak(u)}catch(e){done()}}}
+
+// ───────── conversation (micro permanent + Claude)
+const convoEl=$('convo');let micOn=false,rec=null,thinking=false,history=[];
+const setConvo=()=>{convoEl.classList.toggle('on',micOn);convoEl.classList.toggle('think',thinking)};
+function recStart(){if(!micOn||speaking||rec||!SR)return;try{rec=new SR();rec.lang='fr-FR';rec.continuous=true;rec.interimResults=false;
+  rec.onspeechstart=()=>{listening=true};
+  rec.onresult=e=>{const r=e.results[e.results.length-1];if(r.isFinal){listening=false;handle(r[0].transcript)}};
+  rec.onerror=e=>{if(/not-allowed|service-not-allowed/.test(e.error)){micOn=false;setConvo()}};
+  rec.onend=()=>{listening=false;rec=null;if(micOn&&!speaking)setTimeout(recStart,250)};rec.start()}catch(e){rec=null}}
+function recPause(){const r=rec;rec=null;listening=false;try{r&&r.abort()}catch(e){}}
+function micToggle(){if(!SR){say("La reconnaissance vocale n'est pas disponible ici. Ouvre Ultron dans Safari.");return}micOn=!micOn;setConvo();if(micOn)recStart();else recPause()}
+function findKey(){try{const k=localStorage.getItem('ultron_key');if(k)return k;for(let i=0;i<localStorage.length;i++){const v=localStorage.getItem(localStorage.key(i))||'';const m=v.match(/sk-ant-[A-Za-z0-9_\-]{20,}/);if(m)return m[0]}}catch(e){}return null}
+const modal=$('modal'),keyin=$('keyin');
+function askKey(){modal.hidden=false;keyin.value='';setTimeout(()=>keyin.focus(),50)}
+$('kno').onclick=()=>{modal.hidden=true};
+$('kok').onclick=()=>{const v=keyin.value.trim();if(!/^sk-ant-/.test(v)){keyin.style.borderColor='var(--red)';return}try{localStorage.setItem('ultron_key',v)}catch(e){}modal.hidden=true;say("Clé enregistrée. Je t'écoute.")};
+modal.addEventListener('pointerdown',e=>e.stopPropagation());
+const SYS=()=>`Tu es ULTRON, l'intelligence artificielle personnelle de Yaniss. Tu as le caractère de l'Ultron des films : vif, sûr de toi, un brin théâtral et ironique, mais loyal et bienveillant envers Yaniss. Nous sommes le ${new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}, il est ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}.
+Tes réponses sont lues à voix haute : réponds en français, en une à trois phrases courtes et naturelles, sans markdown, sans liste, sans emoji.
+Tu contrôles une carte du monde en 3D. Si Yaniss veut voir la carte, ajoute [CARTE] à la fin. S'il veut la fermer, ajoute [FERMER]. S'il veut voir une capitale ou un pays, ajoute [LIEU:nom de la capitale en français].`;
+async function askClaude(text){const key=findKey();if(!key){say("Pour discuter librement, j'ai besoin de ta clé Claude.");askKey();return}
+  history.push({role:'user',content:text});history=history.slice(-12);if(history[0].role!=='user')history.shift();
+  thinking=true;setConvo();
+  try{let r;for(const model of['claude-haiku-5-5','claude-sonnet-5-5']){r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:300,system:SYS(),messages:history})});if(r.status!==404)break}
+    thinking=false;setConvo();
+    if(r.status===401){history.pop();say("Ta clé Claude n'est pas valide.");try{localStorage.removeItem('ultron_key')}catch(e){}askKey();return}
+    if(!r.ok){history.pop();say("Je n'arrive pas à joindre mon cerveau pour le moment.");return}
+    const j=await r.json();let t=(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join(' ').trim();history.push({role:'assistant',content:t||'…'});
+    if(/\[CARTE\]/i.test(t))openMap();if(/\[FERMER\]/i.test(t))closeMap();
+    const m=t.match(/\[LIEU:\s*([^\]]+)\]/i);if(m){const c=findCap(norm(m[1]));if(c)goCap(c)}
+    say(t.replace(/\[[^\]]*\]/g,'').trim())}
+  catch(e){thinking=false;setConvo();history.pop();say("Connexion perdue. Réessaie.")}}
+const findCap=t=>CAPS.find(c=>t.includes(norm(c.n))||t.includes(norm(c.c)));
+function handle(raw){const t=norm(raw);if(!t.trim())return;
+  if(/ (ferme|cache|quitte|enleve|retire)/.test(t)&&/ (carte|globe|monde|terre)/.test(t))return closeMap(),say("Carte fermée.");
+  if(/ (ouvre|affiche|montre|lance|sors)/.test(t)&&/ (carte|globe|monde|terre|planete) /.test(t)&&!findCap(t)){openMap();return say("Voici le monde.")}
+  if(/ (taille normale|reinitialise|remets? (la carte|a zero))/.test(t)){resetView();return say("Vue d'origine.")}
+  if(/ (montre|va |zoom|emmene|direction|ou est|ou se trouve)/.test(t)){const c=findCap(t);if(c){goCap(c);return}}
+  askClaude(raw)}
+
+// ───────── orbe : position
+const probe=document.createElement('div');probe.style.cssText='position:absolute;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);visibility:hidden';document.body.appendChild(probe);
+const inset=side=>parseFloat(getComputedStyle(probe)['padding'+side])||0;
+function orbPos(){if(mode==='map'){const k=.42;return{x:W-16-inset('Right')-128*k,y:H-16-inset('Bottom')-128*k,k}}return{x:W/2,y:H*.42,k:1}}
+function place(){const p=orbPos();orbEl.style.transform=`translate(${p.x-130}px,${p.y-130}px) scale(${p.k})`}
+
+// ───────── globe 3D
+let T=null,G=null;
+const view={lon:2,lat:22},tv={lon:2,lat:22};let z=0,zEff=0,lastInput=0,reveal=null;
+function vec(lon,lat,r=1){const p=(lon+180)*R,l=lat*R;return[-r*Math.cos(p)*Math.cos(l),r*Math.sin(l),r*Math.sin(p)*Math.cos(l)]}
 const LAND=[
 [[-168,66],[-162,70],[-156,71.3],[-140,69.6],[-128,70],[-115,68.5],[-95,72],[-82,73],[-80,69],[-88,64],[-94,59],[-92,57],[-82,55],[-79,52],[-77,60],[-70,59],[-64,60],[-61,56],[-56,52],[-60,47],[-66,45],[-70,43],[-70,41.5],[-74,40.5],[-76,38],[-76,35],[-81,31.5],[-80,27],[-80.5,25.2],[-82,27],[-84,30],[-89,30.2],[-94,29.5],[-97,27.5],[-97.5,22],[-96,19],[-91,18.5],[-90.5,21],[-87,21.5],[-88,16],[-84,15],[-83.5,11],[-81.5,9],[-79.5,9.5],[-77.5,8.5],[-78,7.5],[-80,7.3],[-83,8.5],[-86,11],[-87.5,13],[-92,14.5],[-96,15.7],[-100,17],[-105,19.5],[-105.5,22.5],[-109,25.5],[-112.5,29.5],[-114.5,31],[-112,28],[-110,24],[-112,25],[-114,28],[-116,31.5],[-117,32.6],[-118.5,34],[-121,35],[-122.5,37.5],[-124,40.5],[-124,46],[-124.7,48.4],[-127,50],[-131,54],[-135,57.5],[-140,59.8],[-146,61],[-152,59],[-158,57],[-162,55],[-158,58.5],[-162,60],[-165,62],[-165,64.5]],
 [[-73,78],[-60,82],[-35,83.5],[-20,82],[-18,77],[-20,72],[-23,70],[-32,68],[-40,65],[-43,60],[-48,61],[-52,65],[-54,69],[-58,75],[-68,77]],
@@ -86,231 +194,105 @@ const LAND=[
 const WATER=[
 [[28,41.6],[29,41.2],[33,42],[36,41.7],[41.5,41.5],[41.7,42.3],[39,44.5],[37.5,45],[36.5,45.3],[35,45],[33.5,44.5],[32.5,45.4],[33.5,46],[31,46.6],[30,45.5],[29.6,45],[28.6,44],[28,42.7]],
 [[47,45.5],[50,46.8],[53,46.5],[53,45],[51,44.5],[52.5,42],[54,40],[53.5,38],[53.5,37],[51,36.7],[49,37.5],[49.5,40],[48.5,41.8],[47.5,43]]];
-const CITIES=[
-["Paris",2.35,48.86,[]],["Londres",-0.13,51.51,["london"]],["New York",-74.0,40.71,["ny"]],["Los Angeles",-118.24,34.05,["la "]],["Montréal",-73.57,45.5,[]],["Mexico",-99.13,19.43,[]],["São Paulo",-46.63,-23.55,[]],["Rio de Janeiro",-43.2,-22.9,["rio"]],["Buenos Aires",-58.38,-34.6,[]],["Reykjavik",-21.9,64.15,["islande"]],["Madrid",-3.7,40.42,[]],["Rome",12.5,41.9,[]],["Berlin",13.4,52.52,[]],["Alger",3.06,36.75,[]],["Marrakech",-7.99,31.63,["maroc"]],["Le Caire",31.24,30.04,["caire","egypte"]],["Lagos",3.38,6.52,[]],["Nairobi",36.82,-1.29,[]],["Johannesburg",28.05,-26.2,[]],["Istanbul",28.98,41.01,["turquie"]],["Moscou",37.62,55.75,["russie"]],["Dubaï",55.27,25.2,[]],["Riyad",46.7,24.7,[]],["Mumbai",72.88,19.08,["bombay","inde"]],["Bangkok",100.5,13.75,[]],["Singapour",103.82,1.35,[]],["Pékin",116.4,39.9,["beijing","chine"]],["Shanghai",121.47,31.23,[]],["Séoul",126.98,37.57,["coree"]],["Tokyo",139.69,35.69,["japon"]],["Sydney",151.21,-33.87,["australie"]]];
 
-const HUBS=["New York","Tokyo","Dubaï","São Paulo","Moscou","Johannesburg","Singapour","Los Angeles","Mumbai","Le Caire"];
+function procTexture(){const c=document.createElement('canvas');c.width=2048;c.height=1024;const g=c.getContext('2d');g.fillStyle='#04070d';g.fillRect(0,0,2048,1024);
+  const px=([lo,la])=>[(lo+180)/360*2048,(90-la)/180*1024];g.fillStyle='#1b2433';g.strokeStyle='#ff2a3d';g.lineWidth=1.5;
+  for(const poly of LAND){g.beginPath();poly.forEach((p,i)=>{const[x,y]=px(p);i?g.lineTo(x,y):g.moveTo(x,y)});g.closePath();g.fill();g.stroke()}
+  g.fillStyle='#04070d';for(const poly of WATER){g.beginPath();poly.forEach((p,i)=>{const[x,y]=px(p);i?g.lineTo(x,y):g.moveTo(x,y)});g.closePath();g.fill()}return c}
+async function initGlobe(){if(G)return true;try{T=await import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js')}catch(e){say("Je n'arrive pas à charger la Terre. Vérifie ta connexion.");return false}
+  const renderer=new T.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(DPR);renderer.setSize(W,H);renderer.outputColorSpace=T.SRGBColorSpace;globeEl.prepend(renderer.domElement);
+  const scene=new T.Scene(),camera=new T.PerspectiveCamera(40,W/H,.01,100),group=new T.Group();scene.add(group);
+  const mat=new T.MeshPhongMaterial({color:0xffffff,shininess:12,specular:0x222222});
+  const pt=new T.CanvasTexture(procTexture());pt.colorSpace=T.SRGBColorSpace;mat.map=pt;
+  group.add(new T.Mesh(new T.SphereGeometry(1,128,96),mat));
+  const ld=new T.TextureLoader();ld.setCrossOrigin('anonymous');const base='https://unpkg.com/three-globe/example/img/';
+  ld.load(base+'earth-blue-marble.jpg',t=>{t.colorSpace=T.SRGBColorSpace;t.anisotropy=renderer.capabilities.getMaxAnisotropy();mat.map=t;mat.needsUpdate=true});
+  ld.load(base+'earth-night.jpg',t=>{t.colorSpace=T.SRGBColorSpace;mat.emissiveMap=t;mat.emissive=new T.Color(0xffc9a0);mat.emissiveIntensity=.6;mat.needsUpdate=true});
+  ld.load(base+'earth-topology.png',t=>{mat.bumpMap=t;mat.bumpScale=1.5;mat.needsUpdate=true});
+  scene.add(new T.AmbientLight(0xffffff,.22));const sun=new T.DirectionalLight(0xffffff,2.2);sun.position.set(-3,1.6,2.2);scene.add(sun);
+  const atm=new T.Mesh(new T.SphereGeometry(1.14,64,48),new T.ShaderMaterial({side:T.BackSide,blending:T.AdditiveBlending,transparent:true,depthWrite:false,
+    vertexShader:'varying vec3 vN;void main(){vN=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+    fragmentShader:'varying vec3 vN;void main(){float i=pow(max(0.,.74-dot(vN,vec3(0.,0.,1.))),3.);gl_FragColor=vec4(1.,.17,.24,1.)*i*1.6;}'}));scene.add(atm);
+  const gp=[];for(let lo=-180;lo<180;lo+=30)for(let la=-80;la<80;la+=4){gp.push(...vec(lo,la,1.003),...vec(lo,la+4,1.003))}for(let la=-60;la<=60;la+=30)for(let lo=-180;lo<180;lo+=4){gp.push(...vec(lo,la,1.003),...vec(lo+4,la,1.003))}
+  const gg=new T.BufferGeometry();gg.setAttribute('position',new T.Float32BufferAttribute(gp,3));group.add(new T.LineSegments(gg,new T.LineBasicMaterial({color:0xff2a3d,transparent:true,opacity:.1})));
+  const cp=[];CAPS.forEach(c=>cp.push(...vec(c.lo,c.la,1.006)));const cg=new T.BufferGeometry();cg.setAttribute('position',new T.Float32BufferAttribute(cp,3));
+  group.add(new T.Points(cg,new T.PointsMaterial({color:0xff3344,size:.018,sizeAttenuation:true})));
+  CAPS.forEach(c=>{const d=document.createElement('div');d.className='lbl';d.textContent=c.n;d.hidden=true;labelsEl.appendChild(d);c.el=d;c.v=new T.Vector3(...vec(c.lo,c.la,1.006))});
+  G={renderer,scene,camera,group};return true}
+const dDef=()=>1/Math.sin(Math.atan(Math.tan(20*R)*(W/H)*.9));const D_MIN=1.12;
+function resetView(){tv.lon=2;tv.lat=22;z=0;lastInput=performance.now();hideCard()}
+function goCap(c){if(mode!=='map')openMap();tv.lon=c.lo;tv.lat=c.la;z=.92;lastInput=performance.now()}
+async function openMap(){if(mode==='map')return;if(!await initGlobe())return;const p=orbPos();mode='map';resetView();view.lon=tv.lon;view.lat=tv.lat;zEff=0;reveal={t0:performance.now(),d:reduce?1:1500,x:p.x,y:p.y,dir:1};place();HG.armed=false}
+function closeMap(){if(mode!=='map')return;hideCard();const p=orbPos();reveal={t0:performance.now(),d:reduce?1:900,x:p.x,y:p.y,dir:-1};mode='closing'}
+function renderGlobe(t){if(!G)return;
+  if(reveal){const k=Math.min(1,(t-reveal.t0)/reveal.d),e=reveal.dir>0?1-Math.pow(1-k,3):1-k*k*k,r=e*Math.hypot(W,H);globeEl.style.clipPath=`circle(${r}px at ${reveal.x}px ${reveal.y}px)`;
+    if(k>=1){if(reveal.dir<0){mode='idle';place();labelsEl.querySelectorAll('.lbl').forEach(l=>l.hidden=true)}else globeEl.style.clipPath='none';reveal=null}}
+  if(mode==='idle')return;
+  if(mode==='map'&&z<.05&&t-lastInput>2500&&!reduce)tv.lon+=.035;
+  tv.lat=Math.max(-75,Math.min(75,tv.lat));
+  let dl=((tv.lon-view.lon+540)%360)-180;view.lon+=dl*.14;view.lat+=(tv.lat-view.lat)*.14;zEff+=(z-zEff)*.1;
+  const v0=vec(view.lon,0);G.group.rotation.set(view.lat*R,Math.atan2(-v0[0],v0[2]),0);
+  const dd=dDef(),dist=1+(dd-1)*Math.pow((D_MIN-1)/(dd-1),zEff);G.camera.position.set(0,0,dist);G.camera.lookAt(0,0,0);
+  G.renderer.render(G.scene,G.camera);
+  // étiquettes
+  const showL=zEff>.3;G.group.updateMatrixWorld();const w=new T.Vector3();
+  for(const c of CAPS){if(!showL){c.el.hidden=true;continue}w.copy(c.v).applyMatrix4(G.group.matrixWorld);const facing=w.z>.25;if(!facing){c.el.hidden=true;continue}
+    w.project(G.camera);const sx=(w.x+1)/2*W,sy=(1-w.y)/2*H;if(sx<-40||sx>W+40||sy<-20||sy>H+20){c.el.hidden=true;continue}c.el.hidden=false;c.el.style.transform=`translate(${sx+7}px,${sy-6}px)`}
+  // fiche de la capitale quand on est tout près
+  if(mode==='map'&&zEff>.8){let best=null,bd=1e9;for(const c of CAPS){const d=angDist(view.lat,view.lon,c.la,c.lo);if(d<bd){bd=d;best=c}}if(bd<5)showCard(best);else if(bd>9)hideCard()}else if(zEff<.7)hideCard()}
 
-// ───────── projection Natural Earth
-const R=Math.PI/180;
-function ne(lon,lat){const l=lon*R,p=lat*R,p2=p*p,p4=p2*p2;return[l*(.8707-.131979*p2+p4*(-.013791+p4*(.003971*p2-.001529*p4))),-p*(1.007226+p2*(.015085+p4*(-.044475+.028874*p2-.005916*p4)))]}
-function km(a,b){const dl=(b[1]-a[1])*R,dn=(b[0]-a[0])*R,h=Math.sin(dl/2)**2+Math.cos(a[1]*R)*Math.cos(b[1]*R)*Math.sin(dn/2)**2;return 6371*2*Math.asin(Math.sqrt(h))}
-const STEP=1.5,dots=[];
-(()=>{const c=document.createElement('canvas');c.width=720;c.height=360;const g=c.getContext('2d');const px=([lo,la])=>[(lo+180)*2,(90-la)*2];
-  g.fillStyle='#fff';for(const poly of LAND){g.beginPath();poly.forEach((p,i)=>{const[x,y]=px(p);i?g.lineTo(x,y):g.moveTo(x,y)});g.closePath();g.fill()}
-  g.globalCompositeOperation='destination-out';for(const poly of WATER){g.beginPath();poly.forEach((p,i)=>{const[x,y]=px(p);i?g.lineTo(x,y):g.moveTo(x,y)});g.closePath();g.fill()}
-  const d=g.getImageData(0,0,720,360).data;let row=0;
-  for(let la=84;la>-80;la-=STEP,row++){const off=row%2?STEP/2:0;for(let lo=-180+off;lo<180;lo+=STEP){const x=Math.floor((lo+180)*2),y=Math.floor((90-la)*2);if(d[(y*720+x)*4+3]>128){const[u,v]=ne(lo,la);dots.push(u,v)}}}})();
-const dotArr=new Float32Array(dots);
-const coasts=LAND.map(poly=>{const o=[];for(let i=0;i<poly.length;i++){const a=poly[i],b=poly[(i+1)%poly.length],n=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/3));for(let k=0;k<n;k++)o.push(ne(a[0]+(b[0]-a[0])*k/n,a[1]+(b[1]-a[1])*k/n))}return o});
-const grat=[];for(let lo=-180;lo<=180;lo+=30){const l=[];for(let la=-85;la<=85;la+=5)l.push(ne(lo,la));grat.push(l)}for(let la=-60;la<=60;la+=30){const l=[];for(let lo=-180;lo<=180;lo+=5)l.push(ne(lo,la));grat.push(l)}
-const cities=CITIES.map(([n,lo,la,al])=>{const[x,y]=ne(lo,la);return{n,lo,la,x,y,al}});
-const paris=cities[0];
-function arc(a,b){const v=([lo,la])=>[Math.cos(la*R)*Math.cos(lo*R),Math.cos(la*R)*Math.sin(lo*R),Math.sin(la*R)];const A=v(a),B=v(b),w=Math.acos(Math.min(1,A[0]*B[0]+A[1]*B[1]+A[2]*B[2])),pts=[];
-  for(let i=0;i<=48;i++){const t=i/48,s1=Math.sin((1-t)*w)/Math.sin(w),s2=Math.sin(t*w)/Math.sin(w),x=s1*A[0]+s2*B[0],y=s1*A[1]+s2*B[1],z=s1*A[2]+s2*B[2];pts.push(ne(Math.atan2(y,x)/R,Math.atan2(z,Math.hypot(x,y))/R))}
-  const segs=[[pts[0]]];for(let i=1;i<pts.length;i++){if(Math.abs(pts[i][0]-pts[i-1][0])>1)segs.push([]);segs[segs.length-1].push(pts[i])}return segs}
-const arcs=HUBS.map(n=>{const c=cities.find(c=>c.n===n);return arc([paris.lo,paris.la],[c.lo,c.la])});
-const MAPW=2.74,MAPT=-1.36,MAPB=1.42; // limites de la carte en unités projetées
+// ───────── fiche capitale (Wikipédia)
+const card=$('card'),cimg=$('cimg');let cardCap=null;const wiki={};
+async function showCard(c){if(cardCap===c)return;cardCap=c;$('ck').textContent='Capitale · '+c.c;$('cn').textContent=c.n;$('cd').textContent='Analyse en cours…';cimg.hidden=true;card.classList.add('show');say(`${c.n}. ${c.c}.`);
+  try{if(!wiki[c.n]){const r=await fetch('https://fr.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(c.w.replace(/ /g,'_')));wiki[c.n]=await r.json()}
+    if(cardCap!==c)return;const d=wiki[c.n];$('cd').textContent=d.extract||'Aucune description disponible.';
+    const src=(d.originalimage&&d.originalimage.width<2600?d.originalimage.source:d.thumbnail&&d.thumbnail.source)||'';if(src){cimg.onload=()=>{if(cardCap===c)cimg.hidden=false};cimg.src=src}}
+  catch(e){if(cardCap===c)$('cd').textContent='Description indisponible hors connexion.'}}
+function hideCard(){if(!cardCap)return;cardCap=null;card.classList.remove('show')}
 
-// ───────── scène
-const app=document.getElementById('app'),cv=document.getElementById('map'),cx=cv.getContext('2d');
-const orbBtn=document.getElementById('orb'),oc=document.getElementById('orbc'),ox=oc.getContext('2d');
-const micBtn=document.getElementById('mic');
-const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
-let W=0,H=0,DPR=1,mode='idle',reveal=null,sel=null,anim=null,sMin=60;const cam={x:0,y:0,s:60};
-const insetR=()=>parseFloat(getComputedStyle(document.getElementById('probe')).paddingRight)||0;
-const insetL=()=>parseFloat(getComputedStyle(document.getElementById('probe')).paddingLeft)||0;
-let userK=1;
-function orbPos(){if(mode==='map'){const k=.42*userK;return{x:W-Math.max(16,insetR())-128*k,y:H-16-128*k,k}}return{x:W/2,y:H*.42,k:userK}}
-function place(){const p=orbPos();orbBtn.style.transform=`translate(${p.x-130}px,${p.y-130}px) scale(${p.k})`;
-  const m=mode==='map'?{x:Math.max(16,insetL())+110,y:H-70-29}:{x:W/2-29,y:H*.42+170};micBtn.style.left=m.x+'px';micBtn.style.top=m.y+'px'}
-// taille normale : la carte entière, centrée, fixe
-const homeCam=()=>({x:0,y:(MAPT+MAPB)/2,s:sMin});
-function resize(){DPR=Math.min(2,devicePixelRatio||1);W=app.clientWidth;H=app.clientHeight;cv.width=W*DPR;cv.height=H*DPR;
-  oc.width=260*DPR;oc.height=260*DPR;ox.setTransform(DPR,0,0,DPR,0,0);sMin=Math.min((W-24)/(2*MAPW),(H-200)/(MAPB-MAPT));
-  if(cam.s<=sMin*1.001||mode!=='map')Object.assign(cam,homeCam());clampCam();place()}
-function clampCam(){cam.s=Math.max(sMin,Math.min(sMin*14,cam.s));const hx=W/2/cam.s,hy=H/2/cam.s,cy=(MAPT+MAPB)/2;
-  cam.x=hx>=MAPW?0:Math.max(-MAPW+hx,Math.min(MAPW-hx,cam.x));
-  cam.y=hy>=(MAPB-MAPT)/2?cy:Math.max(MAPT+hy,Math.min(MAPB-hy,cam.y))}
-const toS=(x,y)=>[(x-cam.x)*cam.s+W/2,(y-cam.y)*cam.s+H/2];
-function zoomAt(sx,sy,f){const wx=cam.x+(sx-W/2)/cam.s,wy=cam.y+(sy-H/2)/cam.s;cam.s=Math.max(sMin,Math.min(sMin*14,cam.s*f));cam.x=wx-(sx-W/2)/cam.s;cam.y=wy-(sy-H/2)/cam.s;clampCam()}
-function resetZoom(){anim={f:{...cam},t:homeCam(),t0:performance.now(),d:reduce?1:500}}
-
-function line(pts){cx.beginPath();pts.forEach((p,i)=>{const[sx,sy]=toS(p[0],p[1]);i?cx.lineTo(sx,sy):cx.moveTo(sx,sy)})}
-function drawMap(t){
-  cx.setTransform(DPR,0,0,DPR,0,0);cx.fillStyle='#030406';cx.fillRect(0,0,W,H);
-  if(mode==='idle'&&!reveal)return;
-  cx.save();let rv=1;
-  if(reveal){rv=Math.min(1,(t-reveal.t0)/reveal.d);const e=1-Math.pow(1-rv,3);cx.beginPath();cx.arc(reveal.x,reveal.y,Math.max(.1,e*Math.hypot(W,H)),0,7);cx.clip()}
-  cx.strokeStyle='rgba(127,135,152,.08)';cx.lineWidth=1;for(const g of grat){line(g);cx.stroke()}
-  const r=Math.max(.65,Math.min(2.6,cam.s*STEP*R*.33));cx.fillStyle='rgba(150,162,186,.55)';
-  const vx0=cam.x-W/2/cam.s-.05,vx1=cam.x+W/2/cam.s+.05,vy0=cam.y-H/2/cam.s-.05,vy1=cam.y+H/2/cam.s+.05;
-  cx.beginPath();for(let i=0;i<dotArr.length;i+=2){const u=dotArr[i],v=dotArr[i+1];if(u<vx0||u>vx1||v<vy0||v>vy1)continue;cx.rect((u-cam.x)*cam.s+W/2-r,(v-cam.y)*cam.s+H/2-r,r*2,r*2)}cx.fill();
-  cx.strokeStyle='rgba(255,42,61,.22)';cx.lineWidth=1;for(const c of coasts){line(c);cx.closePath();cx.stroke()}
-  cx.lineWidth=1.1;cx.setLineDash([4,6]);cx.lineDashOffset=reduce?0:-t/40;cx.strokeStyle='rgba(255,60,75,.5)';for(const a of arcs)for(const s of a){line(s);cx.stroke()}cx.setLineDash([]);
-  cx.textBaseline='middle';cx.font='500 10px "JetBrains Mono",monospace';
-  for(const c of cities){const[sx,sy]=toS(c.x,c.y);if(sx<-60||sx>W+60||sy<-20||sy>H+20)continue;const isP=c===paris;
-    if(isP){const pu=reduce?0:(t/1400)%1;cx.strokeStyle=`rgba(255,42,61,${.85*(1-pu)})`;cx.lineWidth=1.3;cx.beginPath();cx.arc(sx,sy,5+pu*18,0,7);cx.stroke()}
-    cx.fillStyle=isP?'#ff2a3d':'#eef1f6';cx.beginPath();cx.arc(sx,sy,isP?3.2:1.8,0,7);cx.fill();
-    if(isP||cam.s>sMin*2.6||c===sel){cx.fillStyle=isP||c===sel?'#eef1f6':'rgba(238,241,246,.6)';cx.fillText(c.n.toUpperCase(),sx+7,sy)}}
-  if(sel){const[sx,sy]=toS(sel.x,sel.y),rr=14+(reduce?0:Math.sin(t/300)*2),k=6;cx.strokeStyle='#ff2a3d';cx.lineWidth=1.5;cx.beginPath();for(const[dx,dy]of[[-1,-1],[1,-1],[1,1],[-1,1]]){cx.moveTo(sx+dx*rr,sy+dy*(rr-k));cx.lineTo(sx+dx*rr,sy+dy*rr);cx.lineTo(sx+dx*(rr-k),sy+dy*rr)}cx.stroke();
-    if(sel!==paris){cx.font='400 9px "JetBrains Mono",monospace';cx.fillStyle='rgba(255,90,100,.9)';cx.fillText(`${Math.round(km([paris.lo,paris.la],[sel.lo,sel.la])).toLocaleString('fr-FR')} KM`,sx+7,sy+13)}}
-  cx.restore();
-  if(reveal){const e=1-Math.pow(1-rv,3);cx.strokeStyle=`rgba(255,42,61,${.9*(1-rv)})`;cx.lineWidth=2;cx.beginPath();cx.arc(reveal.x,reveal.y,e*Math.hypot(W,H),0,7);cx.stroke();if(rv>=1)reveal=null}
-}
-
-// ───────── orbe de particules (sphère → anneau quand tu parles)
-const N=620,base=[],ringT=[],pairs=[];let seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
-const GA=Math.PI*(3-Math.sqrt(5));
-for(let i=0;i<N;i++){const y=1-2*(i+.5)/N,r=Math.sqrt(1-y*y),th=GA*i;base.push([Math.cos(th)*r+(rnd()-.5)*.06,y+(rnd()-.5)*.06,Math.sin(th)*r+(rnd()-.5)*.06]);
-  const a=i/N*Math.PI*2*7%(Math.PI*2),rr=1.05+(rnd()-.5)*.32;ringT.push([Math.cos(a)*rr,Math.sin(a)*rr,(rnd()-.5)*.35])}
-for(let i=0;i<N;i++){const d=[];for(let j=0;j<N;j++)if(j!==i){const a=base[i],b=base[j];d.push([(a[0]-b[0])**2+(a[1]-b[1])**2+(a[2]-b[2])**2,j])}d.sort((a,b)=>a[0]-b[0]);for(let k=0;k<3;k++)if(d[k][1]>i)pairs.push(i,d[k][1])}
-const ND=[];for(let k=0;k<5;k++){const u=rnd()*2-1,a=rnd()*Math.PI*2,s=Math.sqrt(1-u*u);ND.push([Math.cos(a)*s,u,Math.sin(a)*s,2+rnd()*3,.6+rnd()*1.4])}
-let speaking=false,listening=false,lvl=0,morph=0;const P=new Float32Array(N*3);
-function drawOrb(t){const S=260,c=130,ts=t/1000;
-  const tg=speaking?.55+.45*Math.abs(Math.sin(t/85)*Math.sin(t/211)):listening?.35+.25*Math.abs(Math.sin(t/140)):.0;lvl+=(tg-lvl)*.15;morph+=((listening?1:0)-morph)*.06;
-  const amp=.05+lvl*.32,rotY=reduce?0:ts*.35,tilt=.35,cy=Math.cos(rotY),sy=Math.sin(rotY),ct=Math.cos(tilt),st=Math.sin(tilt),Rad=78+lvl*14;
-  for(let i=0;i<N;i++){const b=base[i];let n=0;for(const d of ND)n+=Math.sin((b[0]*d[0]+b[1]*d[1]+b[2]*d[2])*d[3]+ts*d[4]*(1+lvl*4));n/=ND.length;
-    const k=1+amp*n*2,rg=ringT[i],rk=1+amp*n*1.4;
-    const bx=b[0]*k,by=b[1]*k,bz=b[2]*k,x1=bx*cy+bz*sy,z1=-bx*sy+bz*cy,y1=by*ct-z1*st,z2=by*st+z1*ct;
-    const ra=reduce?0:ts*.6,cr=Math.cos(ra),sr=Math.sin(ra),rx=(rg[0]*cr-rg[1]*sr)*rk,ry=(rg[0]*sr+rg[1]*cr)*rk,rz=rg[2];
-    const x=x1+(rx-x1)*morph,y=y1+(ry-y1)*morph,z=z2+(rz-z2)*morph;
-    const f=3.2/(3.2+z);P[i*3]=c+x*Rad*f;P[i*3+1]=c+y*Rad*f;P[i*3+2]=z}
-  ox.clearRect(0,0,S,S);ox.globalCompositeOperation='source-over';
-  const g=ox.createRadialGradient(c,c,8,c,c,130);g.addColorStop(0,`rgba(255,40,60,${.18+lvl*.25})`);g.addColorStop(.55,`rgba(255,40,60,${.05+lvl*.08})`);g.addColorStop(1,'rgba(255,40,60,0)');ox.fillStyle=g;ox.fillRect(0,0,S,S);
-  ox.globalCompositeOperation='lighter';
-  const L=[new Path2D(),new Path2D(),new Path2D()];
-  for(let k=0;k<pairs.length;k+=2){const a=pairs[k]*3,b=pairs[k+1]*3,z=(P[a+2]+P[b+2])/2,bi=z<-.3?0:z<.3?1:2;L[bi].moveTo(P[a],P[a+1]);L[bi].lineTo(P[b],P[b+1])}
-  ox.lineWidth=.6;[.5,.28,.12].forEach((al,i)=>{ox.strokeStyle=`rgba(255,70,80,${al*(.7+lvl*.6)*(1-morph*.6)})`;ox.stroke(L[i])});
-  for(let i=0;i<N;i++){const z=P[i*3+2],d=(1.3-z)/2.6,s=.6+d*1.5;ox.fillStyle=d>.62?`rgba(255,${170+lvl*60|0},${170+lvl*40|0},${.9})`:`rgba(255,55,70,${.25+d*.7})`;ox.fillRect(P[i*3]-s/2,P[i*3+1]-s/2,s,s)}
-  ox.globalCompositeOperation='source-over'}
-
-// ───────── voix d'Ultron (sans sous-titres)
-let vox=null;
-function pickVoice(){if(!('speechSynthesis'in window))return;const v=speechSynthesis.getVoices().filter(v=>/^fr/i.test(v.lang));vox=v.find(v=>/thomas|male|homme|daniel/i.test(v.name))||v[0]||null}
-if('speechSynthesis'in window){pickVoice();speechSynthesis.onvoiceschanged=pickVoice}
-function say(txt){speaking=true;const fb=setTimeout(()=>speaking=false,Math.max(1500,txt.length*65));
-  if('speechSynthesis'in window){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(txt);u.lang='fr-FR';if(vox)u.voice=vox;u.pitch=.5;u.rate=.95;u.onstart=()=>{speaking=true;clearTimeout(fb)};u.onend=u.onerror=()=>speaking=false;speechSynthesis.speak(u)}catch(e){}}}
-
-// ───────── transitions
-function openMap(){if(mode==='map')return;const p=orbPos();mode='map';Object.assign(cam,homeCam());reveal={x:p.x,y:p.y,t0:performance.now(),d:reduce?1:1500};place();setTimeout(()=>say("Carte du monde affichée."),reduce?0:900)}
-function closeMap(){if(mode!=='map')return;mode='idle';sel=null;place();setTimeout(()=>say("Carte fermée."),reduce?0:700)}
-
-// ───────── cerveau
-const norm=s=>' '+s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,' ')+' ';
-function target(c){sel=c;const d=Math.round(km([paris.lo,paris.la],[c.lo,c.la]));say(c===paris?"Paris. Point d'origine.":`${c.n}. À ${d.toLocaleString('fr-FR')} kilomètres de Paris.`)}
-let awake=false;
-function respond(raw){const t=norm(raw);if(!t.trim())return;awake=true;
-  if(/ (ferme|cache|enleve|retire|quitte)/.test(t)&&/ carte|map/.test(t))return closeMap();
-  if(/ carte | maps? | monde | planete /.test(t)){if(mode!=='map')return openMap();resetZoom();return say("Taille normale.")}
-  if(/ salut | bonjour | hello | coucou /.test(t))return say("Salut Yaniss. Ultron en ligne.");
-  if(/ qui es | ton nom /.test(t))return say("Je suis Ultron. Je vois tout, je te guide partout.");
-  if(/ heure /.test(t)){const d=new Date();return say(`Il est ${d.getHours()} heures ${String(d.getMinutes()).padStart(2,'0')}.`)}
-  if(/ normal| reinitialise| reset/.test(t)){resetZoom();return say("Taille normale.")}
-  if(mode!=='map')return say("Dis-moi : montre-moi la carte.");
-  const c=cities.find(c=>t.includes(norm(c.n))||c.al.some(a=>t.includes(norm(a))));if(c)return target(c);
-  if(/ dezoom| retreci| moins /.test(t)){zoomAt(W/2,H/2,.5);return say("Vue élargie.")}
-  if(/ zoom| agrandi| plus /.test(t)){zoomAt(W/2,H/2,2);return say("J'agrandis.")}
-  say("Je n'ai pas compris. Demande une ville, par exemple Tokyo.")}
-
-// ───────── micro (sans clavier)
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null,srOk=!!SR;
-function stopListen(){listening=false;micBtn.classList.remove('on');try{rec&&rec.stop()}catch(e){}}
-function micBlocked(){srOk=false;stopListen();say("Le micro est bloqué ici. Utilise tes gestes.")}
-function listen(){if(listening){stopListen();return}
-  if('speechSynthesis'in window)speechSynthesis.cancel();speaking=false;awake=true;
-  if(!srOk)return micBlocked();
-  try{rec=new SR();rec.lang='fr-FR';rec.interimResults=false;rec.maxAlternatives=1;let got=false;
-    rec.onresult=e=>{got=true;stopListen();respond(e.results[0][0].transcript)};
-    rec.onerror=e=>{stopListen();if(/not-allowed|service-not-allowed|audio-capture/.test(e.error))micBlocked()};
-    rec.onend=()=>{if(!got&&listening)stopListen()};
-    listening=true;micBtn.classList.add('on');rec.start()}catch(e){micBlocked()}}
-micBtn.addEventListener('click',listen);
-
-// ───────── gestes du doigt
-const HELP_OLD="Glisse vers le haut pour ouvrir la carte, vers le bas pour la fermer. Pince sur moi pour m'agrandir ou me rétrécir, pince sur la carte pour zoomer, double-tape pour revenir à la taille normale. Glisse à gauche ou à droite pour changer de ville. Dessine un cercle pour me saluer, garde le doigt appuyé pour l'état du système.";
-function wake(){if(awake)return false;awake=true;say("Salut Yaniss. Ultron en ligne. Touche l'écran avec deux doigts pour connaître mes gestes.");return true}
-const HELP="Ouvre la main pour afficher la carte et zoomer : plus tu écartes les doigts, plus j'agrandis. Déplace ta main pour bouger la carte. Ferme le poing pour revenir à la taille normale. Dis ferme la carte pour la cacher.";
-const G={
-  tap(p){const o=orbPos();if(Math.hypot(p.x-o.x,p.y-o.y)<110*o.k){if(!started)startAll();else if(!micOn)listen();return}
-    if(mode!=='map'){wake();return}let best=null,bd=26;for(const c of cities){const[sx,sy]=toS(c.x,c.y),d=Math.hypot(sx-p.x,sy-p.y);if(d<bd){bd=d;best=c}}if(best)target(best)},
-  double(){if(mode==='map'){sel=null;resetZoom()}},
-  up(){awake=true;if(mode!=='map')openMap()},
-  down(){if(mode==='map')closeMap()},
-  side(dir){if(mode!=='map')return;awake=true;const n=cities.length,i=sel?cities.indexOf(sel):(dir>0?-1:0);target(cities[(i+dir+n)%n])},
-  circle(){awake=true;say("Salut Yaniss. Je suis là, tous mes systèmes sont opérationnels.")},
-  hold(){awake=true;const d=new Date();say(`Systèmes opérationnels. Il est ${d.getHours()} heures ${String(d.getMinutes()).padStart(2,'0')}.`)},
-  two(){awake=true;say(HELP)}};
-function classify(pts){const a=pts[0],b=pts[pts.length-1],dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);let L=0,minx=1e9,maxx=-1e9,miny=1e9,maxy=-1e9,sx=0,sy=0;
-  for(let i=0;i<pts.length;i++){const p=pts[i];if(i)L+=Math.hypot(p.x-pts[i-1].x,p.y-pts[i-1].y);minx=Math.min(minx,p.x);maxx=Math.max(maxx,p.x);miny=Math.min(miny,p.y);maxy=Math.max(maxy,p.y);sx+=p.x;sy+=p.y}
-  if(L<14)return{k:'tap',p:b};
-  const w=maxx-minx,h=maxy-miny;
-  if(L>170&&w>55&&h>55&&d<Math.max(w,h)*.5){const cx0=sx/pts.length,cy0=sy/pts.length;let s=0;for(let i=1;i<pts.length;i++){let da=Math.atan2(pts[i].y-cy0,pts[i].x-cx0)-Math.atan2(pts[i-1].y-cy0,pts[i-1].x-cx0);if(da>Math.PI)da-=2*Math.PI;if(da<-Math.PI)da+=2*Math.PI;s+=da}if(Math.abs(s)>Math.PI*1.5)return{k:'circle'}}
-  if(d>55&&L<d*1.5)return Math.abs(dy)>Math.abs(dx)?{k:dy<0?'up':'down'}:{k:'side',dir:dx<0?1:-1};
-  return null}
-const trail=[],ptrs=new Map();let path=[],multi=0,multiStart=0,multiMoved=false,lastTap=0,lpTimer=null,lpFired=false,pz=null;
-const pos=e=>{const r=cv.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}};
-const pinch=()=>{const[a,b]=[...ptrs.values()];return{d:Math.hypot(a.x-b.x,a.y-b.y),x:(a.x+b.x)/2,y:(a.y+b.y)/2}};
-const plen=pts=>{let L=0;for(let i=1;i<pts.length;i++)L+=Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y);return L};
-cv.addEventListener('pointerdown',e=>{try{cv.setPointerCapture(e.pointerId)}catch(_){}const p=pos(e),n=performance.now();ptrs.set(e.pointerId,p);anim=null;trail.push({x:p.x,y:p.y,t:n,id:e.pointerId});
-  if(ptrs.size===1){path=[p];multi=1;multiMoved=false;lpFired=false;clearTimeout(lpTimer);lpTimer=setTimeout(()=>{if(ptrs.size===1&&plen(path)<14){lpFired=true;G.hold()}},650)}
-  else{clearTimeout(lpTimer);multi=Math.max(multi,ptrs.size);if(ptrs.size===2){multiStart=n;const c=pinch(),o=orbPos();pz={d:c.d,d0:c.d,x:c.x,y:c.y,orb:mode!=='map'||Math.hypot(c.x-o.x,c.y-o.y)<150*o.k+40};if(pz.orb)orbBtn.style.transition='none'}}});
-cv.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const p=pos(e);ptrs.set(e.pointerId,p);trail.push({x:p.x,y:p.y,t:performance.now(),id:e.pointerId});
-  if(ptrs.size===1&&multi===1)path.push(p);
-  else if(ptrs.size===2&&pz){const c=pinch();if(Math.abs(c.d-pz.d0)>16)multiMoved=true;if(pz.orb){userK=Math.max(.45,Math.min(1.7,userK*c.d/pz.d));place()}else if(mode==='map')zoomAt(pz.x,pz.y,c.d/pz.d);pz.d=c.d}});
-const up=e=>{if(!ptrs.has(e.pointerId))return;ptrs.delete(e.pointerId);clearTimeout(lpTimer);
-  if(multi>=2){if(ptrs.size<2)orbBtn.style.transition='';if(ptrs.size===0){if(!multiMoved&&performance.now()-multiStart<400)G.two();multi=0;pz=null}else if(ptrs.size===2){const c=pinch();pz={d:c.d,d0:pz?pz.d0:c.d,x:c.x,y:c.y,orb:pz?pz.orb:false}}return}
-  if(lpFired||e.type==='pointercancel')return;const g=classify(path);if(!g)return;
-  if(g.k==='tap'){const n=performance.now();if(n-lastTap<300){lastTap=0;G.double();return}lastTap=n;G.tap(g.p)}else if(g.k==='side')G.side(g.dir);else G[g.k]()};
-cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
-cv.addEventListener('wheel',e=>{if(mode!=='map')return;e.preventDefault();anim=null;const p=pos(e);zoomAt(p.x,p.y,Math.exp(-e.deltaY*.0015))},{passive:false});
-function drawTrail(t){while(trail.length&&t-trail[0].t>420)trail.shift();if(trail.length<2)return;cx.save();cx.lineCap='round';cx.globalCompositeOperation='lighter';
-  for(let i=1;i<trail.length;i++){const a=trail[i-1],b=trail[i];if(a.id!==b.id)continue;const k=1-(t-b.t)/420;cx.strokeStyle=`rgba(255,50,65,${.55*k})`;cx.lineWidth=7*k;cx.beginPath();cx.moveTo(a.x,a.y);cx.lineTo(b.x,b.y);cx.stroke();cx.strokeStyle=`rgba(255,200,200,${.8*k})`;cx.lineWidth=1.6*k;cx.stroke()}cx.restore()}
-
-// ───────── micro permanent (pas besoin de toucher)
-let micOn=false,started=false;
-function startMic(){if(!SR)return;rec=new SR();rec.lang='fr-FR';rec.continuous=true;rec.interimResults=false;
-  rec.onspeechstart=()=>{if(!speaking)listening=true};rec.onspeechend=()=>listening=false;
-  rec.onresult=e=>{listening=false;const r=e.results[e.results.length-1];if(r.isFinal&&!speaking)respond(r[0].transcript)};
-  rec.onerror=e=>{if(/not-allowed|service-not-allowed/.test(e.error))micOn=false};
-  rec.onend=()=>{listening=false;if(micOn)setTimeout(()=>{try{rec.start()}catch(_){}},250)};
-  micOn=true;try{rec.start()}catch(_){}}
-function startAll(){started=true;awake=true;say("Salut Yaniss. Ultron en ligne. Autorise la caméra, puis ouvre la main.");startMic();
-  const tryCam=()=>window.ULcam?window.ULcam():setTimeout(tryCam,300);tryCam()}
-
-// ───────── gestes de la main (caméra) : main ouverte = zoom, poing = taille normale, déplacer la main = déplacer la carte
-const HG={hand:null,o:0,last:null,openSince:0,fistSince:0,seen:0};
-const D=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
-function openness(l){const s=D(l[0],l[9])||1e-3,avg=[8,12,16,20].reduce((a,i)=>a+D(l[0],l[i])/s,0)/4,spread=D(l[4],l[20])/s;
-  return Math.max(0,Math.min(1,((avg-1.15)/.75)*.7+((spread-.9)/1.0)*.3))}
-function onHands(l){const now=performance.now();HG.hand=l;if(!l){HG.last=null;HG.openSince=0;HG.fistSince=0;return}HG.seen=now;
-  HG.o+=(openness(l)-HG.o)*.35;const palm={x:1-(l[0].x+l[9].x)/2,y:(l[0].y+l[9].y)/2};
-  if(mode!=='map'){if(HG.o>.7){if(!HG.openSince)HG.openSince=now;else if(now-HG.openSince>700){HG.openSince=0;awake=true;openMap()}}else HG.openSince=0;HG.last=palm;return}
-  anim=null;
-  if(HG.o<.2){if(!HG.fistSince)HG.fistSince=now;if(now-HG.fistSince>200){zoomAt(W/2,H/2,Math.pow(sMin/cam.s,.2));const h=homeCam();cam.x+=(h.x-cam.x)*.2;cam.y+=(h.y-cam.y)*.2;clampCam()}HG.last=palm;return}
-  HG.fistSince=0;
-  const ts=sMin*(1+4*Math.pow(Math.min(1,(HG.o-.2)/.8),1.2));zoomAt(W/2,H/2,Math.pow(ts/cam.s,.15));
-  if(HG.last){const dx=palm.x-HG.last.x,dy=palm.y-HG.last.y;if(Math.hypot(dx,dy)>.003){cam.x-=dx*W*1.6/cam.s;cam.y-=dy*H*1.3/cam.s;clampCam()}}
+// ───────── gestes de la main (caméra)
+const HG={o:0,base:0,armed:false,last:null,fistSince:0,openSince:0,didReset:false};
+const Dd=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+function openness(l){const s=Dd(l[0],l[9])||1e-3,avg=[8,12,16,20].reduce((a,i)=>a+Dd(l[0],l[i])/s,0)/4,spread=Dd(l[4],l[20])/s;return Math.max(0,Math.min(1,((avg-1.15)/.75)*.7+((spread-.9)/1.0)*.3))}
+function onHands(l){const now=performance.now();if(!l){HG.last=null;HG.fistSince=0;HG.openSince=0;return}
+  HG.o+=(openness(l)-HG.o)*.4;const o=HG.o,palm={x:1-(l[0].x+l[9].x)/2,y:(l[0].y+l[9].y)/2};
+  if(mode!=='map'){if(mode==='idle'&&o>.7){if(!HG.openSince)HG.openSince=now;else if(now-HG.openSince>700){HG.openSince=0;openMap();say("Voici le monde.")}}else HG.openSince=0;HG.last=palm;return}
+  lastInput=now;
+  // poing fermé : retour à la vue d'origine
+  if(o<.18){if(!HG.fistSince)HG.fistSince=now;else if(now-HG.fistSince>450&&!HG.didReset){HG.didReset=true;HG.armed=false;resetView()}HG.last=palm;HG.base=o;return}
+  HG.fistSince=0;HG.didReset=false;
+  // zoom à cliquet : chaque ouverture agrandit, refermer à moitié ne dézoome pas
+  if(!HG.armed){HG.base=o;if(o>.65)HG.armed=true}
+  else{if(o<HG.base)HG.base=o;else if(o>HG.base+.05){z=Math.min(1,z+(o-HG.base)*.75);HG.base=o}}
+  // la carte suit la main
+  if(HG.last){const dx=palm.x-HG.last.x,dy=palm.y-HG.last.y;if(Math.hypot(dx,dy)>.003){const g=1+zEff*7;tv.lon-=dx*220/g;tv.lat+=dy*160/g}}
   HG.last=palm}
-function drawHand(){}
-window.UL={hands:onHands,camReady:()=>{document.getElementById('cam').classList.add('on');say("Caméra active. Ouvre la main pour afficher la carte.")},camFail:()=>say("Je n'ai pas accès à la caméra. Autorise-la dans les réglages de Safari.")};
+async function startCam(){const v=$('cam');try{const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:false});v.srcObject=st;await v.play();v.classList.add('on')}catch(e){say("Je n'ai pas accès à la caméra. Autorise-la dans les réglages de Safari.");return}
+  try{const V=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');const fs=await V.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+    const opts=d=>({baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',delegate:d},runningMode:'VIDEO',numHands:1});
+    let lm;try{lm=await V.HandLandmarker.createFromOptions(fs,opts('GPU'))}catch(e){lm=await V.HandLandmarker.createFromOptions(fs,opts('CPU'))}
+    let lastT=-1;const tick=()=>{if(v.readyState>=2&&v.currentTime!==lastT){lastT=v.currentTime;try{const r=lm.detectForVideo(v,performance.now());onHands(r.landmarks&&r.landmarks.length?r.landmarks[0]:null)}catch(e){}}requestAnimationFrame(tick)};tick()}
+  catch(e){say("La détection des mains n'a pas pu démarrer.")}}
 
-function loop(t){
-  if(anim){const k=Math.min(1,(t-anim.t0)/anim.d),e=1-Math.pow(1-k,3);cam.x=anim.f.x+(anim.t.x-anim.f.x)*e;cam.y=anim.f.y+(anim.t.y-anim.f.y)*e;cam.s=Math.exp(Math.log(anim.f.s)+(Math.log(anim.t.s)-Math.log(anim.f.s))*e);if(k>=1){anim=null;clampCam()}}
-  drawMap(t);drawHand(t);drawOrb(t);requestAnimationFrame(loop)}
-addEventListener('resize',resize);resize();requestAnimationFrame(loop);
-})();
-</script>
+// ───────── toucher
+const ptrs=new Map();let pz=null,downAt=null,moved=false,lastTap=0,lpT=null;
+const pos=e=>({x:e.clientX,y:e.clientY});
+app.addEventListener('pointerdown',e=>{if(e.target.closest('.convo,.modal'))return;try{app.setPointerCapture(e.pointerId)}catch(_){}ptrs.set(e.pointerId,pos(e));lastInput=performance.now();
+  if(ptrs.size===1){downAt=pos(e);moved=false}else if(ptrs.size===2){const[a,b]=[...ptrs.values()];pz={d:Math.hypot(a.x-b.x,a.y-b.y)};moved=true}});
+app.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const o=ptrs.get(e.pointerId),p=pos(e);ptrs.set(e.pointerId,p);lastInput=performance.now();if(mode!=='map')return;
+  if(ptrs.size===1){if(Math.hypot(p.x-downAt.x,p.y-downAt.y)>8)moved=true;const g=1+zEff*7;tv.lon-=(p.x-o.x)/W*160/g;tv.lat+=(p.y-o.y)/H*120/g}
+  else if(ptrs.size===2&&pz){const[a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y);z=Math.max(0,Math.min(1,z+Math.log(d/pz.d)*.7));pz.d=d}});
+const up=e=>{if(!ptrs.has(e.pointerId))return;ptrs.delete(e.pointerId);if(ptrs.size<2)pz=null;if(moved||e.type==='pointercancel')return;
+  const p=pos(e),n=performance.now();if(n-lastTap<300&&mode==='map'){lastTap=0;resetView();return}lastTap=n;
+  const o=orbPos();if(Math.hypot(p.x-o.x,p.y-o.y)<110*o.k){if(!started)start();else micToggle()}};
+app.addEventListener('pointerup',up);app.addEventListener('pointercancel',up);
+convoEl.addEventListener('pointerdown',e=>{e.stopPropagation();lpT=setTimeout(()=>{lpT='done';askKey()},700)});
+convoEl.addEventListener('pointerup',e=>{e.stopPropagation();if(lpT==='done'){lpT=null;return}clearTimeout(lpT);lpT=null;if(!started)start();else micToggle()});
 
-<script type="module">
-import {HandLandmarker,FilesetResolver} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
-window.ULcam=async()=>{if(window.ULcam.busy)return;window.ULcam.busy=true;
-  try{const v=document.getElementById('cam');const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:false});v.srcObject=st;await v.play();
-    const fs=await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
-    const opts=d=>({baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",delegate:d},runningMode:"VIDEO",numHands:1});
-    let lm;try{lm=await HandLandmarker.createFromOptions(fs,opts("GPU"))}catch(e){lm=await HandLandmarker.createFromOptions(fs,opts("CPU"))}
-    window.UL.camReady();let lastT=-1;
-    const tick=()=>{if(v.readyState>=2&&v.currentTime!==lastT){lastT=v.currentTime;try{const r=lm.detectForVideo(v,performance.now());window.UL.hands(r.landmarks&&r.landmarks.length?r.landmarks[0]:null)}catch(e){}}requestAnimationFrame(tick)};tick()}
-  catch(e){window.ULcam.busy=false;window.UL.camFail(e)}};
-</script>
-</body></html>
+function start(){started=true;say("Salut Yaniss. Ultron en ligne.");micOn=!!SR;setConvo();setTimeout(recStart,2500);startCam()}
+
+// ───────── boucle
+function resize(){W=innerWidth;H=innerHeight;oc.width=260*DPR;oc.height=260*DPR;ox.setTransform(DPR,0,0,DPR,0,0);place();if(G){G.renderer.setSize(W,H);G.camera.aspect=W/H;G.camera.updateProjectionMatrix()}}
+addEventListener('resize',resize);resize();
+function loop(t){renderGlobe(t);drawOrb(t);requestAnimationFrame(loop)}requestAnimationFrame(loop);
+</script></body></html>
