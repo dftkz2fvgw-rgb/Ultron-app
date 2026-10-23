@@ -28,6 +28,8 @@ html,body{height:100%;margin:0;background:var(--void);color:var(--ink);font-fami
 .convo.on i{background:var(--red);box-shadow:0 0 8px var(--red);animation:blink 1.4s infinite}
 .convo.think i{background:#ffb35c;box-shadow:0 0 8px #ffb35c}
 @keyframes blink{50%{opacity:.3}}
+.heard{position:absolute;z-index:5;left:calc(116px + env(safe-area-inset-left,0px));right:120px;bottom:calc(70px + env(safe-area-inset-bottom,0px));font:400 12px/1.4 var(--mono);color:var(--dim);opacity:0;transition:opacity .3s;pointer-events:none;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.heard.show{opacity:.85}.heard.final{color:var(--ink)}
 .card{position:absolute;z-index:6;top:calc(16px + env(safe-area-inset-top,0px));left:50%;width:min(360px,calc(100% - 32px));transform:translate(-50%,-14px);opacity:0;transition:opacity .35s,transform .35s;
   background:var(--glass);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid var(--hair);border-top:2px solid var(--red);border-radius:16px;overflow:hidden;pointer-events:none}
 .card.show{opacity:1;transform:translate(-50%,0)}
@@ -82,7 +84,8 @@ html,body{height:100%;margin:0;background:var(--void);color:var(--ink);font-fami
   <div class="orb" id="orb"><canvas id="orbc"></canvas></div>
   <video id="cam" playsinline muted autoplay></video>
   <div class="camst" id="camst">Caméra…</div>
-  <div class="convo" id="convo"><i></i>Conversation</div>
+  <div class="heard" id="heard"></div>
+  <div class="convo" id="convo"><i></i><span>Conversation</span></div>
   <div class="card" id="card"><img id="cimg" alt="" hidden><div class="b"><span class="k" id="ck"></span><h2 id="cn"></h2><p id="cd"></p></div></div>
   <div class="modal" id="modal" hidden><div class="in">
     <h3>CLÉ CLAUDE</h3>
@@ -136,20 +139,32 @@ const angDist=(a,b,c,d)=>{const h=Math.sin((c-a)*R/2)**2+Math.cos(a*R)*Math.cos(
 let vox=null;const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 function pickVoice(){if(!('speechSynthesis'in window))return;const v=speechSynthesis.getVoices().filter(v=>/^fr/i.test(v.lang));vox=v.find(v=>/thomas/i.test(v.name))||v.find(v=>/male|homme|daniel|nicolas/i.test(v.name))||v[0]||null}
 if('speechSynthesis'in window){pickVoice();speechSynthesis.onvoiceschanged=pickVoice}
-function say(txt){if(!txt)return;speaking=true;recPause();const fb=setTimeout(done,Math.max(1500,txt.length*70));
-  function done(){speaking=false;clearTimeout(fb);setTimeout(recStart,300)}
-  if('speechSynthesis'in window){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(txt);u.lang='fr-FR';if(vox)u.voice=vox;u.pitch=.62;u.rate=.96;u.onstart=()=>{speaking=true;clearTimeout(fb)};u.onend=u.onerror=done;speechSynthesis.speak(u)}catch(e){done()}}}
+// say() : parle, coupe le micro pendant ce temps, et relance l'écoute même si iOS oublie de signaler la fin
+let sayId=0;
+function say(txt){if(!txt)return;const id=++sayId;speaking=true;recPause();let ended=false;
+  const done=()=>{if(ended||id!==sayId)return;ended=true;speaking=false;clearInterval(wd);setTimeout(recStart,350)};
+  const t0=performance.now(),maxT=Math.max(2500,txt.length*95);
+  const wd=setInterval(()=>{const el=performance.now()-t0;if(el>maxT||(el>700&&!('speechSynthesis'in window&&(speechSynthesis.speaking||speechSynthesis.pending))))done()},300);
+  if('speechSynthesis'in window){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(txt);u.lang='fr-FR';if(vox)u.voice=vox;u.pitch=.62;u.rate=1.02;u.onend=u.onerror=done;speechSynthesis.speak(u)}catch(e){done()}}else setTimeout(done,txt.length*60)}
 
-// ───────── conversation (micro permanent + Claude)
-const convoEl=$('convo');let micOn=false,rec=null,thinking=false,history=[];
-const setConvo=()=>{convoEl.classList.toggle('on',micOn);convoEl.classList.toggle('think',thinking)};
-function recStart(){if(!micOn||speaking||rec||!SR)return;try{rec=new SR();rec.lang='fr-FR';rec.continuous=true;rec.interimResults=false;
-  rec.onspeechstart=()=>{listening=true};
-  rec.onresult=e=>{const r=e.results[e.results.length-1];if(r.isFinal){listening=false;handle(r[0].transcript)}};
-  rec.onerror=e=>{if(/not-allowed|service-not-allowed/.test(e.error)){micOn=false;setConvo()}};
-  rec.onend=()=>{listening=false;rec=null;if(micOn&&!speaking)setTimeout(recStart,250)};rec.start()}catch(e){rec=null}}
+// ───────── conversation : écoute courte et relancée en boucle (bien plus fiable sur iPhone que le mode continu)
+const convoEl=$('convo'),heardEl=$('heard');let micOn=false,rec=null,thinking=false,history=[],needTap=false,lastRecEvt=0,heardT=null;
+const setConvo=()=>{convoEl.classList.toggle('on',micOn&&!needTap);convoEl.classList.toggle('think',thinking);convoEl.lastChild.textContent=needTap?'Touchez pour écouter':'Conversation'};
+function showHeard(txt,final){heardEl.textContent=txt;heardEl.classList.add('show');heardEl.classList.toggle('final',!!final);clearTimeout(heardT);heardT=setTimeout(()=>heardEl.classList.remove('show'),final?2200:4000)}
+function recStart(){if(!micOn||speaking||thinking||rec||!SR||document.hidden)return;
+  let best='',finalSent=false,silenceT=null;const r=new SR();rec=r;r.lang='fr-FR';r.continuous=false;r.interimResults=true;r.maxAlternatives=1;
+  const finish=()=>{if(finalSent)return;finalSent=true;clearTimeout(silenceT);const txt=best.trim();try{r.abort()}catch(e){}if(rec===r)rec=null;listening=false;if(txt.length>1){showHeard(txt,true);handle(txt)}else setTimeout(recStart,150)};
+  r.onstart=()=>{lastRecEvt=performance.now();needTap=false;setConvo()};
+  r.onresult=e=>{lastRecEvt=performance.now();let txt='',isFinal=false;for(let i=0;i<e.results.length;i++){txt+=e.results[i][0].transcript;if(e.results[i].isFinal)isFinal=true}
+    best=txt;listening=true;showHeard(txt,false);clearTimeout(silenceT);if(isFinal)finish();else silenceT=setTimeout(finish,1100)};
+  r.onerror=e=>{lastRecEvt=performance.now();if(/not-allowed|service-not-allowed/.test(e.error)){needTap=true;setConvo()}};
+  r.onend=()=>{if(rec===r)rec=null;listening=false;if(best&&!finalSent){finish();return}if(!finalSent&&micOn&&!needTap)setTimeout(recStart,120)};
+  try{r.start()}catch(e){rec=null;setTimeout(recStart,500)}}
 function recPause(){const r=rec;rec=null;listening=false;try{r&&r.abort()}catch(e){}}
-function micToggle(){if(!SR){say("La reconnaissance vocale n'est pas disponible ici. Ouvre Ultron dans Safari.");return}micOn=!micOn;userMicOff=!micOn;setConvo();if(micOn)recStart();else recPause()}
+// chien de garde : relance l'écoute si elle s'est arrêtée toute seule
+setInterval(()=>{if(!micOn||speaking||thinking||needTap||document.hidden)return;if(!rec)recStart();else if(performance.now()-lastRecEvt>12000){recPause();recStart()}},1500);
+function micToggle(){if(!SR){say("La reconnaissance vocale n'est pas disponible ici, Monsieur. Ouvrez Ultron dans Safari.");return}
+  if(needTap){needTap=false;micOn=true;setConvo();recStart();return}micOn=!micOn;userMicOff=!micOn;setConvo();if(micOn)recStart();else recPause()}
 function findKey(){try{const k=localStorage.getItem('ultron_key');if(k)return k;for(let i=0;i<localStorage.length;i++){const v=localStorage.getItem(localStorage.key(i))||'';const m=v.match(/sk-ant-[A-Za-z0-9_\-]{20,}/);if(m)return m[0]}}catch(e){}return null}
 const modal=$('modal'),keyin=$('keyin');
 function askKey(){modal.hidden=false;keyin.value='';setTimeout(()=>keyin.focus(),50)}
@@ -162,8 +177,8 @@ ${bodySummary()}
 Tu contrôles un globe terrestre en 3D et un hologramme biométrique de Monsieur (s'il veut le voir, ajoute [CORPS]). Si Monsieur veut voir la carte, ajoute [CARTE] à la fin. S'il veut la fermer, ajoute [FERMER]. S'il veut voir une capitale ou un pays, ajoute [LIEU:nom de la capitale en français].`;
 async function askClaude(text){const key=findKey();if(!key){say("Pour converser librement, Monsieur, j'ai besoin de votre clé Claude.");askKey();return}
   history.push({role:'user',content:text});history=history.slice(-12);if(history[0].role!=='user')history.shift();
-  thinking=true;setConvo();
-  try{let r;for(const model of['claude-haiku-5-5','claude-sonnet-5-5']){r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:300,system:SYS(),messages:history})});if(r.status!==404)break}
+  thinking=true;setConvo();recPause();
+  try{let r;for(const model of['claude-haiku-5-5','claude-sonnet-5-5']){r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model,max_tokens:220,system:SYS(),messages:history})});if(r.status!==404)break}
     thinking=false;setConvo();
     if(r.status===401){history.pop();say("Votre clé Claude n'est pas valide, Monsieur.");try{localStorage.removeItem('ultron_key')}catch(e){}askKey();return}
     if(!r.ok){history.pop();say("Mes circuits ne répondent pas pour le moment, Monsieur.");return}
@@ -416,7 +431,7 @@ app.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const o=
   else if(ptrs.size===2&&pz){const[a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y);z=Math.max(0,Math.min(1,z+Math.log(d/pz.d)*.7));pz.d=d}});
 const up=e=>{if(!ptrs.has(e.pointerId))return;ptrs.delete(e.pointerId);if(ptrs.size<2)pz=null;if(moved||e.type==='pointercancel')return;
   const p=pos(e),n=performance.now();if(n-lastTap<300&&(mode==='map'||mode==='body')){lastTap=0;if(mode==='map')resetView();else{byaw=0;bz=0;btilt=0}return}lastTap=n;
-  if(!started){start();return}if(!camOn)startCam();if(!micOn&&!userMicOff&&SR){micOn=true;setConvo();recStart()}const o=orbPos();if(Math.hypot(p.x-o.x,p.y-o.y)<110*o.k)micToggle()};
+  if(!started){start();return}if(!camOn)startCam();if(needTap||(!micOn&&!userMicOff&&SR)){needTap=false;micOn=true;setConvo();recStart();return}const o=orbPos();if(Math.hypot(p.x-o.x,p.y-o.y)<110*o.k)micToggle()};
 app.addEventListener('pointerup',up);app.addEventListener('pointercancel',up);
 convoEl.addEventListener('pointerdown',e=>{e.stopPropagation();lpT=setTimeout(()=>{lpT='done';askKey()},700)});
 convoEl.addEventListener('pointerup',e=>{e.stopPropagation();if(lpT==='done'){lpT=null;return}clearTimeout(lpT);lpT=null;if(!started)start();else micToggle()});
