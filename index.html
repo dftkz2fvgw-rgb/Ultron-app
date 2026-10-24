@@ -65,6 +65,25 @@ html,body{height:100%;margin:0;background:var(--void);color:var(--ink);font-fami
 .bar i{display:block;height:100%;width:0;background:#3fd6ff;box-shadow:0 0 8px #3fd6ff;transition:width .6s}
 .hint{font-size:10px;letter-spacing:.06em;color:var(--dim)}
 @media (max-width:380px){.grid{grid-template-columns:repeat(2,1fr)}}
+.night{position:absolute;inset:0;z-index:8;pointer-events:none;opacity:0;transition:opacity .8s;box-shadow:inset 0 0 0 10px rgba(255,255,255,.9),inset 0 0 60px 30px rgba(255,255,255,.55)}
+.night.on{opacity:1}
+.lock{position:absolute;inset:0;z-index:20;display:grid;place-items:center;background:var(--void);transition:opacity .6s,background .6s}
+.lock.flash{background:radial-gradient(circle at 50% 42%,#1a1a1a 0 150px,#f4f4f4 151px)}
+.lock.gone{opacity:0}
+.lock[hidden]{display:none}
+.lk{display:flex;flex-direction:column;align-items:center;gap:18px;padding:16px;text-align:center}
+.lk-k{font-size:10px;letter-spacing:.3em;color:var(--red)}
+.lock.flash .lk-k,.lock.flash p{color:#111}
+.lk-ring{position:relative;width:220px;height:220px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,42,61,.6);box-shadow:0 0 40px rgba(255,42,61,.35)}
+.lk-ring video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.lk-ring i{position:absolute;left:0;right:0;height:2px;background:var(--red);box-shadow:0 0 12px var(--red);top:0;animation:scanl 2s ease-in-out infinite}
+@keyframes scanl{50%{top:calc(100% - 2px)}}
+.lock[data-state=ok] .lk-ring{border-color:#3fd68f;box-shadow:0 0 40px rgba(63,214,143,.5)}.lock[data-state=ok] .lk-ring i{display:none}
+.lock[data-state=deny] .lk-ring{border-color:var(--red);box-shadow:0 0 50px rgba(255,42,61,.7)}.lock[data-state=deny] .lk-ring i{display:none}
+.lock[data-state=deny] p{color:var(--red)}
+.lk p{margin:0;max-width:300px;font-size:13px;line-height:1.5;color:var(--ink);min-height:2.6em}
+.lk button{font:600 12px var(--mono);letter-spacing:.16em;padding:11px 20px;border-radius:22px;border:1px solid var(--red);background:none;color:var(--red);cursor:pointer}
+.lk button[hidden]{display:none}
 @media (prefers-reduced-motion:reduce){.orb{transition:none}}
 </style></head><body>
 <div id="app">
@@ -87,6 +106,12 @@ html,body{height:100%;margin:0;background:var(--void);color:var(--ink);font-fami
   <div class="camst" id="camst">Caméra…</div>
   <div class="heard" id="heard"></div>
   <div class="convo" id="convo"><i></i><span>Conversation</span></div>
+  <div class="night" id="night"></div>
+  <div class="lock" id="lock"><div class="lk">
+    <span class="lk-k">ULTRON · SÉCURITÉ</span>
+    <div class="lk-ring"><video id="lockvid" playsinline muted autoplay></video><i></i></div>
+    <p id="lockst">Activation…</p><button id="lockbtn" hidden>Réessayer</button>
+  </div></div>
   <div class="card" id="card"><img id="cimg" alt="" hidden><div class="b"><span class="k" id="ck"></span><h2 id="cn"></h2><p id="cd"></p></div></div>
   <div class="modal" id="modal" hidden><div class="in">
     <h3>CLÉS D'ULTRON</h3>
@@ -190,7 +215,7 @@ async function sttSend(blob){const key=sttKey();if(!key)return;STT.busy=true;sho
 const convoEl=$('convo'),heardEl=$('heard');let micOn=false,rec=null,thinking=false,history=[],needTap=false,lastRecEvt=0,heardT=null;
 const setConvo=()=>{convoEl.classList.toggle('on',micOn&&!needTap);convoEl.classList.toggle('think',thinking);convoEl.lastChild.textContent=needTap?'Touchez pour écouter':'Conversation'};
 function showHeard(txt,final){heardEl.textContent=txt;heardEl.classList.add('show');heardEl.classList.toggle('final',!!final);clearTimeout(heardT);heardT=setTimeout(()=>heardEl.classList.remove('show'),final?2200:4000)}
-function recStart(){if(sttKey()){if(micOn&&!STT.stream)sttInit();return}if(!micOn||speaking||thinking||rec||!SR||document.hidden)return;
+function recStart(){if(locked)return;if(sttKey()){if(micOn&&!STT.stream)sttInit();return}if(!micOn||speaking||thinking||rec||!SR||document.hidden)return;
   let best='',finalSent=false,silenceT=null;const r=new SR();rec=r;r.lang='fr-FR';r.continuous=false;r.interimResults=true;r.maxAlternatives=1;
   const finish=()=>{if(finalSent)return;finalSent=true;clearTimeout(silenceT);const txt=best.trim();try{r.abort()}catch(e){}if(rec===r)rec=null;listening=false;if(txt.length>1){showHeard(txt,true);hear(txt)}else setTimeout(recStart,150)};
   r.onstart=()=>{lastRecEvt=performance.now();needTap=false;setConvo();convoEl.classList.add('live');if(!heardEl.classList.contains('show'))showHeard('🎙 À l\'écoute…',false)};
@@ -257,6 +282,7 @@ function hear(raw){const plain=raw.toLowerCase().normalize('NFD').replace(/[\u03
 function handle(raw){const t=norm(raw);if(!t.trim())return;attentiveUntil=performance.now()+15000;
   if(/ (ferme|cache|quitte|enleve|retire|desactive|eteins)/.test(t)&&/ (carte|globe|monde|terre|corps|hologramme|tout|ca|la) /.test(t)){
     if(mode==='map'){closeMap();return say("Globe désactivé, Monsieur.")}if(mode==='body'){closeBody();return say("Hologramme désactivé, Monsieur.")}}
+  if(/ (reenregistre|reconfigure|change) (mon )?visage /.test(t)){try{localStorage.removeItem('ultron_face')}catch(e){}say("Très bien, Monsieur. Regardez la caméra.");faceGate();return}
   if(bodyCmd(raw))return;
   if(/ (corps|hologramme|sante|biometri|physique|mes donnees|mon poids) /.test(t)){openBody();return say("Analyse biométrique en cours, Monsieur.")}
   if(/ (carte|globe|planete|mappemonde) /.test(t)&&!findCap(t)){openMap();return say("Affichage du globe, Monsieur.")}
@@ -409,9 +435,9 @@ async function startCam(){if(camOn)return;const v=$('cam'),st=$('camst');st.hidd
   catch(e){st.textContent=/NotAllowed|Permission/i.test(e.name+e.message)?'Touche pour autoriser':'Caméra indisponible';return}
   if(handsInit)return;handsInit=true;
   try{const V=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');const fs=await V.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
-    const opts=d=>({baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',delegate:d},runningMode:'VIDEO',numHands:1});
+    const opts=d=>({baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',delegate:d},runningMode:'VIDEO',numHands:1,minHandDetectionConfidence:.35,minHandPresenceConfidence:.35,minTrackingConfidence:.35});
     let lm;try{lm=await V.HandLandmarker.createFromOptions(fs,opts('GPU'))}catch(e){lm=await V.HandLandmarker.createFromOptions(fs,opts('CPU'))}
-    let lastT=-1;const tick=()=>{if(v.readyState>=2&&v.currentTime!==lastT){lastT=v.currentTime;try{const r=lm.detectForVideo(v,performance.now());onHands(r.landmarks&&r.landmarks.length?r.landmarks[0]:null)}catch(e){}}requestAnimationFrame(tick)};tick()}
+    let lastT=-1;const tick=()=>{if(v.readyState>=2&&v.currentTime!==lastT){lastT=v.currentTime;try{if(locked){requestAnimationFrame(tick);return}const r=lm.detectForVideo(enhancedFrame(v),performance.now());onHands(r.landmarks&&r.landmarks.length?r.landmarks[0]:null)}catch(e){}}requestAnimationFrame(tick)};tick()}
   catch(e){say("La détection des mains n'a pas pu démarrer.")}}
 
 // ───────── hologramme du corps + données biométriques
@@ -485,10 +511,56 @@ function renderBody(t){if(!B)return;
   B.renderer.render(B.scene,B.camera)}
 function instantCloseMap(){if(mode!=='map')return;hideCard();globeEl.style.clipPath='circle(0px at 50% 50%)';reveal=null;labelsEl.querySelectorAll('.lbl').forEach(l=>l.hidden=true);mode='idle'}
 
+// ───────── vision de nuit : on éclaircit l'image avant de chercher la main ou le visage
+const PC=document.createElement('canvas');PC.width=320;PC.height=240;const PX=PC.getContext('2d',{willReadFrequently:true});
+let lum=.5,lut=null,lutGain=0;const nightEl=$('night');let darkN=0;
+function enhancedFrame(v){const w=320,h=Math.round(320*(v.videoHeight||480)/(v.videoWidth||640));if(PC.height!==h)PC.height=h;PX.drawImage(v,0,0,w,h);
+  const img=PX.getImageData(0,0,w,h),d=img.data;let sum=0,n=0;for(let i=0;i<d.length;i+=64){sum+=d[i]*.3+d[i+1]*.59+d[i+2]*.11;n++}lum=sum/n/255;
+  // écran utilisé comme lampe quand il fait sombre
+  if(lum<.16)darkN=Math.min(60,darkN+1);else if(lum>.24)darkN=Math.max(0,darkN-1);nightEl.classList.toggle('on',darkN>20&&!locked);lockEl.classList.toggle('flash',lum<.2);
+  if(lum<.35){const gain=Math.min(5,.42/Math.max(.02,lum));if(!lut||Math.abs(gain-lutGain)>.15){lutGain=gain;lut=new Uint8ClampedArray(256);for(let i=0;i<256;i++)lut[i]=255*Math.pow(Math.min(1,i/255*gain),.8)}
+    for(let i=0;i<d.length;i+=4){d[i]=lut[d[i]];d[i+1]=lut[d[i+1]];d[i+2]=lut[d[i+2]]}PX.putImageData(img,0,0)}
+  return PC}
+
+// ───────── verrouillage par reconnaissance du visage
+const lockEl=$('lock'),lockSt=$('lockst'),lockVid=$('lockvid'),lockBtn=$('lockbtn');let locked=true,faceApi=null,gateRunning=false,hiddenAt=0;
+const FAPI='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.esm.js',FMOD='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/';
+const lockSay=(t,cls)=>{lockSt.textContent=t;lockEl.dataset.state=cls||''};
+const loadFace=()=>{try{return JSON.parse(localStorage.getItem('ultron_face'))}catch(e){return null}};
+const dist=(a,b)=>{let s=0;for(let i=0;i<a.length;i++){const x=a[i]-b[i];s+=x*x}return Math.sqrt(s)};
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+async function readFace(){const v=$('cam');if(v.readyState<2)return null;const f=enhancedFrame(v);
+  const r=await faceApi.detectSingleFace(f,new faceApi.TinyFaceDetectorOptions({inputSize:320,scoreThreshold:.35})).withFaceLandmarks().withFaceDescriptor();return r?Array.from(r.descriptor):null}
+async function faceGate(){if(gateRunning)return;gateRunning=true;locked=true;lockEl.hidden=false;lockEl.classList.remove('gone');lockBtn.hidden=true;hideCard();
+  try{lockSay('Activation de la caméra…','scan');for(let i=0;i<100&&!camStream;i++)await wait(150);
+    if(!camStream){lockSay('Caméra indisponible. Autorisez-la dans les réglages de Safari.','deny');lockBtn.hidden=false;return}
+    lockVid.srcObject=camStream;lockVid.play().catch(()=>{});
+    if(!faceApi){lockSay('Chargement de la reconnaissance faciale…','scan');faceApi=await import(FAPI);
+      await faceApi.nets.tinyFaceDetector.loadFromUri(FMOD);await faceApi.nets.faceLandmark68Net.loadFromUri(FMOD);await faceApi.nets.faceRecognitionNet.loadFromUri(FMOD)}
+    const saved=loadFace();
+    if(!saved||!saved.samples||!saved.samples.length){ // première fois : on enregistre le visage de Monsieur
+      lockSay('Première activation. Regardez la caméra, Monsieur.','scan');const samples=[];const t0=performance.now();
+      while(samples.length<6&&performance.now()-t0<30000){const d=await readFace();if(d){samples.push(d);lockSay(`Enregistrement du visage… ${Math.round(samples.length/6*100)} %`,'scan')}await wait(250)}
+      if(samples.length<6){lockSay('Visage introuvable. Placez-vous face à l\'écran, dans la lumière.','deny');lockBtn.hidden=false;return}
+      try{localStorage.setItem('ultron_face',JSON.stringify({samples,date:Date.now()}))}catch(e){}unlock("Visage enregistré. Bienvenue, Monsieur.");return}
+    lockSay('Identification en cours…','scan');const t0=performance.now();let seen=0,stranger=0;
+    while(performance.now()-t0<15000){const d=await readFace();if(d){seen++;const best=Math.min(...saved.samples.map(s=>dist(s,d)));
+        if(best<.48){unlock("Identité confirmée. Bonjour, Monsieur.");return}if(best>.58)stranger++;if(stranger>=4)break}
+      else if(performance.now()-t0>4000&&!seen)lockSay('Je ne vois pas de visage. Regardez l\'écran.','scan');await wait(200)}
+    lockSay(seen?'ACCÈS REFUSÉ — visage non reconnu':'ACCÈS REFUSÉ — aucun visage détecté','deny');lockBtn.hidden=false;
+    if(seen)say("Accès refusé. Vous n'êtes pas Monsieur.")}
+  catch(e){lockSay('Reconnaissance impossible (connexion ?). Réessayez.','deny');lockBtn.hidden=false}
+  finally{gateRunning=false}}
+function unlock(msg){locked=false;lockSay('IDENTITÉ CONFIRMÉE','ok');setTimeout(()=>{lockEl.classList.add('gone');setTimeout(()=>{lockEl.hidden=true},700)},700);
+  if(!started)start(msg);else{say(msg);if(micWasOn||!userMicOff){micOn=true;setConvo();setTimeout(recStart,600)}}}
+lockBtn.addEventListener('click',e=>{e.stopPropagation();startCam();faceGate()});
+lockEl.addEventListener('pointerdown',e=>{e.stopPropagation();if(!camOn)startCam()});
+lockEl.addEventListener('pointerup',e=>e.stopPropagation());
+
 // ───────── toucher
 const ptrs=new Map();let pz=null,downAt=null,moved=false,lastTap=0,lpT=null;
 const pos=e=>({x:e.clientX,y:e.clientY});
-app.addEventListener('pointerdown',e=>{if(e.target.closest('.convo,.modal'))return;try{app.setPointerCapture(e.pointerId)}catch(_){}ptrs.set(e.pointerId,pos(e));lastInput=performance.now();
+app.addEventListener('pointerdown',e=>{if(locked)return;if(e.target.closest('.convo,.modal'))return;try{app.setPointerCapture(e.pointerId)}catch(_){}ptrs.set(e.pointerId,pos(e));lastInput=performance.now();
   if(ptrs.size===1){downAt=pos(e);moved=false}else if(ptrs.size===2){const[a,b]=[...ptrs.values()];pz={d:Math.hypot(a.x-b.x,a.y-b.y)};moved=true}});
 app.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const o=ptrs.get(e.pointerId),p=pos(e);ptrs.set(e.pointerId,p);lastInput=performance.now();
   if(mode==='body'){if(ptrs.size===1){if(Math.hypot(p.x-downAt.x,p.y-downAt.y)>8)moved=true;byaw+=(p.x-o.x)/W*6;btilt=Math.max(-1,Math.min(1,btilt+(p.y-o.y)/H*3))}else if(ptrs.size===2&&pz){const[a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y);bz=Math.max(0,Math.min(1,bz+Math.log(d/pz.d)*.7));pz.d=d}return}
@@ -503,14 +575,14 @@ app.addEventListener('pointerup',up);app.addEventListener('pointercancel',up);
 convoEl.addEventListener('pointerdown',e=>{e.stopPropagation();lpT=setTimeout(()=>{lpT='done';askKey()},700)});
 convoEl.addEventListener('pointerup',e=>{e.stopPropagation();if(lpT==='done'){lpT=null;return}clearTimeout(lpT);lpT=null;if(!started)start();else micToggle()});
 
-function start(){started=true;setTimeout(()=>{if(SR&&!rec&&!needTap)showHeard('🎙 Démarrage du micro…',false)},800);say("Bonjour Monsieur. Tous mes systèmes sont en ligne.");micOn=!!SR;setConvo();setTimeout(recStart,2500);startCam()}
-start();
+function start(msg){started=true;setTimeout(()=>{if(SR&&!rec&&!needTap)showHeard('🎙 Démarrage du micro…',false)},800);say(msg||"Bonjour Monsieur. Tous mes systèmes sont en ligne.");micOn=!!SR;setConvo();setTimeout(recStart,2500);startCam()}
+startCam();faceGate();
 
 // ───────── appli fermée : micro et caméra coupés
 let micWasOn=false;
-function sleepAll(){if(STT.state==='rec')sttStop(false);micWasOn=micOn;micOn=false;recPause();setConvo();try{speechSynthesis.cancel()}catch(e){}speaking=false;
+function sleepAll(){hiddenAt=Date.now();if(STT.state==='rec')sttStop(false);micWasOn=micOn;micOn=false;recPause();setConvo();try{speechSynthesis.cancel()}catch(e){}speaking=false;
   if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null}camOn=false;const v=$('cam');v.srcObject=null;const st=$('camst');st.hidden=false;st.textContent='Caméra en pause'}
-function wakeAll(){startCam();if(micWasOn||!userMicOff){micOn=true;setConvo();setTimeout(recStart,600)}}
+function wakeAll(){startCam();if(Date.now()-hiddenAt>30000){faceGate();return}if(micWasOn||!userMicOff){micOn=true;setConvo();setTimeout(recStart,600)}}
 document.addEventListener('visibilitychange',()=>{document.hidden?sleepAll():wakeAll()});
 addEventListener('pagehide',sleepAll);addEventListener('pageshow',e=>{if(e.persisted)wakeAll()});
 // ───────── boucle
