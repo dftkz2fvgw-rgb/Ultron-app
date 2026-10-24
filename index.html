@@ -257,8 +257,8 @@ function recStart(){if(locked)return;if(sttKey()){if(micOn&&!STT.stream)sttInit(
     best=txt;listening=true;showHeard(txt,false);clearTimeout(silenceT);if(isFinal)finish();else silenceT=setTimeout(finish,1100)};
   r.onerror=e=>{lastRecEvt=performance.now();const er=e.error||'';
     if(er==='not-allowed'){needTap=true;setConvo();micHelp("Autorisez le micro : touchez l'écran, puis acceptez. Sinon : Réglages, Safari, Micro, Autoriser.")}
-    else if(er==='service-not-allowed'){needTap=true;setConvo();micHelp("La dictée est désactivée. Réglages, Général, Clavier : activez Dictée. Et ouvrez Ultron dans Safari, pas depuis l'écran d'accueil.")}
-    else if(er==='audio-capture')micHelp("Le micro est utilisé par une autre appli. Fermez-la puis revenez.");
+    else if(er==='service-not-allowed'){needTap=true;setConvo();if(!sttKey()){micHelp("La dictée d'Apple est bloquée ici. Ajoutez une clé Groq gratuite pour que je vous entende partout.");setTimeout(askKey,2500)}else micHelp("La dictée est bloquée.")}
+    else if(er==='audio-capture'){if(!sttKey()){micHelp("Le micro est bloqué par l'iPhone. Ajoutez une clé Groq gratuite pour que je vous entende partout.");setTimeout(askKey,2500)}}
     else if(er==='network')micHelp("La dictée a besoin d'internet. Vérifiez votre connexion.")};
   r.onend=()=>{if(rec===r)rec=null;listening=false;if(best&&!finalSent){finish();return}if(!finalSent&&micOn&&!needTap)setTimeout(recStart,120)};
   try{r.start()}catch(e){rec=null;setTimeout(recStart,500)}}
