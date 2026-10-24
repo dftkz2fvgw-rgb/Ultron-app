@@ -328,7 +328,7 @@ function hear(raw){const plain=raw.toLowerCase().normalize('NFD').replace(/[\u03
 function handle(raw){const t=norm(raw);if(!t.trim())return;attentiveUntil=performance.now()+15000;
   if(/ (ferme|cache|quitte|enleve|retire|desactive|eteins)/.test(t)&&/ (carte|globe|monde|terre|corps|hologramme|tout|ca|la) /.test(t)){
     if(mode==='map'){closeMap();return say("Globe désactivé, Monsieur.")}if(mode==='body'){closeBody();return say("Hologramme désactivé, Monsieur.")}}
-  if(/ (reenregistre|reconfigure|change) (mon )?visage /.test(t)){try{localStorage.removeItem('ultron_face')}catch(e){}say("Très bien, Monsieur. Regardez la caméra.");faceGate();return}
+  if(/ (reenregistre|reconfigure|change) (mon )?visage /.test(t)){try{localStorage.removeItem(FKEY)}catch(e){}say("Très bien, Monsieur. Regardez la caméra.");faceGate();return}
   if(bodyCmd(raw))return;
   if(/ (hologramme )?(du )?(poids|silhouette) /.test(t)&&!/\d/.test(t)){openBody(0);return say("Hologramme du poids, Monsieur.")}
   if(/ (hydratation|eau) /.test(t)&&!/ (bu|bois|zero|remets?) /.test(t)){openBody(1);return say("Hologramme d'hydratation, Monsieur.")}
@@ -660,30 +660,56 @@ function enhancedFrame(v){const w=320,h=Math.round(320*(v.videoHeight||480)/(v.v
 // ───────── verrouillage par reconnaissance du visage
 const lockEl=$('lock'),lockSt=$('lockst'),lockVid=$('lockvid'),lockBtn=$('lockbtn');let locked=true,faceApi=null,gateRunning=false,hiddenAt=0;
 const FAPI='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.esm.js',FMOD='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/';
+const FKEY='ultron_face_v2';let useSSD=true;
 const lockSay=(t,cls)=>{lockSt.textContent=t;lockEl.dataset.state=cls||''};
-const loadFace=()=>{try{return JSON.parse(localStorage.getItem('ultron_face'))}catch(e){return null}};
+const loadFace=()=>{try{return JSON.parse(localStorage.getItem(FKEY))}catch(e){return null}};
+const saveFace=f=>{try{localStorage.setItem(FKEY,JSON.stringify(f))}catch(e){}};
 const dist=(a,b)=>{let s=0;for(let i=0;i<a.length;i++){const x=a[i]-b[i];s+=x*x}return Math.sqrt(s)};
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
-async function readFace(){const v=$('cam');if(v.readyState<2)return null;const f=enhancedFrame(v);
-  const r=await faceApi.detectSingleFace(f,new faceApi.TinyFaceDetectorOptions({inputSize:320,scoreThreshold:.35})).withFaceLandmarks().withFaceDescriptor();return r?Array.from(r.descriptor):null}
+// image plus grande et éclaircie seulement si besoin, pour une reconnaissance précise
+const FC=document.createElement('canvas'),FX=FC.getContext('2d',{willReadFrequently:true});
+function faceFrame(v){const w=480,h=Math.round(480*(v.videoHeight||480)/(v.videoWidth||640));FC.width=w;FC.height=h;FX.drawImage(v,0,0,w,h);
+  if(lum<.3){const img=FX.getImageData(0,0,w,h),d=img.data,gain=Math.min(4,.4/Math.max(.03,lum));for(let i=0;i<d.length;i+=4){d[i]=Math.min(255,255*Math.pow(d[i]/255*gain,.85));d[i+1]=Math.min(255,255*Math.pow(d[i+1]/255*gain,.85));d[i+2]=Math.min(255,255*Math.pow(d[i+2]/255*gain,.85))}FX.putImageData(img,0,0)}
+  return FC}
+async function readFace(minScore=.6){const v=$('cam');if(v.readyState<2)return null;enhancedFrame(v);const f=faceFrame(v);
+  const opt=useSSD?new faceApi.SsdMobilenetv1Options({minConfidence:.45}):new faceApi.TinyFaceDetectorOptions({inputSize:416,scoreThreshold:.4});
+  const r=await faceApi.detectSingleFace(f,opt).withFaceLandmarks().withFaceDescriptor();if(!r)return null;
+  const box=r.detection.box,sc=r.detection.score;if(sc<minScore||box.width<f.width*.16)return{tooSmall:box.width<f.width*.16,lowScore:sc<minScore};
+  // orientation approximative de la tête (gauche/droite) à partir du nez et des yeux
+  const lm=r.landmarks.positions,nose=lm[30],le=lm[36],re=lm[45],yaw=((nose.x-le.x)/(re.x-le.x)-.5);
+  return{d:Array.from(r.descriptor),yaw,score:sc}}
+function match(saved,d){const ds=saved.samples.map(s=>dist(s,d)).sort((a,b)=>a-b),best=ds[0],m3=(ds[0]+(ds[1]??ds[0])+(ds[2]??ds[0]))/3;return{best,m3}}
+const STEPS=[['Regardez droit vers l\'écran, Monsieur.',v=>Math.abs(v)<.12],['Tournez légèrement la tête vers la gauche.',v=>v>.08],['Maintenant légèrement vers la droite.',v=>v<-.08],['Revenez face à l\'écran et approchez un peu.',v=>Math.abs(v)<.15]];
+async function enroll(){const samples=[];say("Enregistrement de votre visage, Monsieur. Suivez mes instructions.");await wait(1500);
+  for(let si=0;si<STEPS.length;si++){const[txt,ok]=STEPS[si];lockSay(txt,'scan');say(txt);let got=0;const t0=performance.now();await wait(900);
+    while(got<4&&performance.now()-t0<14000){const r=await readFace(.75);
+      if(r&&r.d&&ok(r.yaw)){if(!samples.length||Math.min(...samples.map(x=>dist(x,r.d)))>.08){samples.push(r.d);got++;lockSay(`${txt}  ${Math.round(samples.length/16*100)} %`,'scan')}}
+      else if(r&&r.tooSmall)lockSay('Approchez votre visage de l\'écran.','scan');await wait(180)}}
+  if(samples.length<8){lockSay('Enregistrement incomplet. Placez-vous dans la lumière et réessayez.','deny');lockBtn.hidden=false;return false}
+  saveFace({samples,base:samples.length,date:Date.now()});return true}
 async function faceGate(){if(gateRunning)return;gateRunning=true;locked=true;lockEl.hidden=false;lockEl.classList.remove('gone');lockBtn.hidden=true;hideCard();
   try{lockSay('Activation de la caméra…','scan');for(let i=0;i<100&&!camStream;i++)await wait(150);
     if(!camStream){lockSay('Caméra indisponible. Autorisez-la dans les réglages de Safari.','deny');lockBtn.hidden=false;return}
     lockVid.srcObject=camStream;lockVid.play().catch(()=>{});
     if(!faceApi){lockSay('Chargement de la reconnaissance faciale…','scan');faceApi=await import(FAPI);
-      await faceApi.nets.tinyFaceDetector.loadFromUri(FMOD);await faceApi.nets.faceLandmark68Net.loadFromUri(FMOD);await faceApi.nets.faceRecognitionNet.loadFromUri(FMOD)}
-    const saved=loadFace();
-    if(!saved||!saved.samples||!saved.samples.length){ // première fois : on enregistre le visage de Monsieur
-      lockSay('Première activation. Regardez la caméra, Monsieur.','scan');const samples=[];const t0=performance.now();
-      while(samples.length<6&&performance.now()-t0<30000){const d=await readFace();if(d){samples.push(d);lockSay(`Enregistrement du visage… ${Math.round(samples.length/6*100)} %`,'scan')}await wait(250)}
-      if(samples.length<6){lockSay('Visage introuvable. Placez-vous face à l\'écran, dans la lumière.','deny');lockBtn.hidden=false;return}
-      try{localStorage.setItem('ultron_face',JSON.stringify({samples,date:Date.now()}))}catch(e){}unlock("Visage enregistré. Bienvenue, Monsieur.");return}
-    lockSay('Identification en cours…','scan');const t0=performance.now();let seen=0,stranger=0;
-    while(performance.now()-t0<15000){const d=await readFace();if(d){seen++;const best=Math.min(...saved.samples.map(s=>dist(s,d)));
-        if(best<.48){unlock("Identité confirmée. Bonjour, Monsieur.");return}if(best>.58)stranger++;if(stranger>=4)break}
-      else if(performance.now()-t0>4000&&!seen)lockSay('Je ne vois pas de visage. Regardez l\'écran.','scan');await wait(200)}
-    lockSay(seen?'ACCÈS REFUSÉ — visage non reconnu':'ACCÈS REFUSÉ — aucun visage détecté','deny');lockBtn.hidden=false;
-    if(seen)say("Accès refusé. Vous n'êtes pas Monsieur.")}
+      try{await faceApi.nets.ssdMobilenetv1.loadFromUri(FMOD)}catch(e){useSSD=false;await faceApi.nets.tinyFaceDetector.loadFromUri(FMOD)}
+      await faceApi.nets.faceLandmark68Net.loadFromUri(FMOD);await faceApi.nets.faceRecognitionNet.loadFromUri(FMOD)}
+    let saved=loadFace();
+    if(!saved||!saved.samples||saved.samples.length<8){if(!await enroll())return;unlock("Visage enregistré. Bienvenue, Monsieur.");return}
+    lockSay('Identification en cours…','scan');const t0=performance.now();let seen=0,stranger=0,good=0,lastD=null;
+    while(performance.now()-t0<15000){const r=await readFace(.55);
+      if(r&&r.d){seen++;const{best,m3}=match(saved,r.d);
+        if(best<.42||m3<.47){good++;lastD=r.d;if(good>=2||best<.36){
+          // apprentissage : le visage reconnu enrichit le modèle (lumière, coiffure, barbe…)
+          if(best>.22){saved.samples.push(r.d);const extra=saved.samples.length-saved.base;if(extra>20)saved.samples.splice(saved.base,1);saveFace(saved)}
+          unlock("Identité confirmée. Bonjour, Monsieur.");return}}
+        else{good=0;if(best>.6)stranger++}
+        if(stranger>=5)break}
+      else if(r&&r.tooSmall)lockSay('Approchez votre visage de l\'écran.','scan');
+      else if(performance.now()-t0>4000&&!seen)lockSay('Je ne vois pas de visage. Regardez l\'écran.','scan');
+      await wait(150)}
+    lockSay(stranger>=5?'ACCÈS REFUSÉ — visage non reconnu':seen?'Identification incertaine. Touchez Réessayer.':'ACCÈS REFUSÉ — aucun visage détecté','deny');lockBtn.hidden=false;
+    if(stranger>=5)say("Accès refusé. Vous n'êtes pas Monsieur.")}
   catch(e){lockSay('Reconnaissance impossible (connexion ?). Réessayez.','deny');lockBtn.hidden=false}
   finally{gateRunning=false}}
 function unlock(msg){locked=false;lockSay('IDENTITÉ CONFIRMÉE','ok');setTimeout(()=>{lockEl.classList.add('gone');setTimeout(()=>{lockEl.hidden=true},700)},700);
