@@ -66,6 +66,12 @@ html,body{height:100%;margin:0;background:var(--void);color:var(--ink);font-fami
 .hint{font-size:10px;letter-spacing:.06em;color:var(--dim)}
 @media (max-width:340px){.grid{grid-template-columns:repeat(2,1fr)}}
 .st:active{border-color:rgba(255,42,61,.6);background:rgba(40,8,12,.6)}
+.hlbl{position:absolute;z-index:5;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:14px;pointer-events:auto}
+.hlbl[hidden]{display:none}
+.hlbl div{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:150px}
+.hlbl b{font:600 15px var(--display);letter-spacing:.22em;color:var(--ink)}
+.hlbl span{font-size:10px;letter-spacing:.08em;color:var(--dim)}
+.hlbl button{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,42,61,.5);background:rgba(10,12,17,.6);color:var(--red);font:500 20px/1 var(--mono);cursor:pointer}
 .qk{display:flex;flex-wrap:wrap;gap:6px}.qk:empty{display:none}
 .qk button{font:500 12px var(--mono);padding:8px 11px;border-radius:9px;border:1px solid var(--hair);background:#05070a;color:var(--ink);cursor:pointer}
 .e2{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--dim)}.e2[hidden]{display:none}.e2 input{flex:1}
@@ -96,6 +102,7 @@ body:has(.night.on) .fx{opacity:0}
 <div id="app">
   <div id="globe"><div id="labels"></div></div>
   <div id="body3d"></div>
+  <div class="hlbl" id="hlbl" hidden><button id="hlp" aria-label="Précédent">‹</button><div><b id="hlt">POIDS</b><span id="hlv"></span></div><button id="hln" aria-label="Suivant">›</button></div>
   <div class="bui" id="bodyUI" hidden>
     <div class="bh"><span class="k">Santé · analyse biométrique</span><h2>MONSIEUR</h2></div>
     <div class="grid">
@@ -265,6 +272,7 @@ function micToggle(){if(!SR&&!sttKey()){askKey();return}if(false){say("La reconn
 function findKey(){try{const k=localStorage.getItem('ultron_key');if(k)return k.trim();if(localStorage.getItem('ultron_key_bad'))return null;for(let i=0;i<localStorage.length;i++){const v=localStorage.getItem(localStorage.key(i))||'';const m=v.match(/sk-ant-[A-Za-z0-9_\-]{20,}/);if(m)return m[0]}}catch(e){}return null}
 const modal=$('modal'),keyin=$('keyin'),sttin=$('sttin');
 function askKey(){modal.hidden=false;keyin.value='';sttin.value='';sttin.placeholder=sttKey()?'••••  enregistrée':'gsk_…';keyin.placeholder=findKey()?'••••  enregistrée':'sk-ant-…';setTimeout(()=>(sttKey()?keyin:sttin).focus(),50)}
+$('hlp').onclick=e=>{e.stopPropagation();switchHolo(-1)};$('hln').onclick=e=>{e.stopPropagation();switchHolo(1)};
 $('kno').onclick=()=>{modal.hidden=true};
 $('kok').onclick=()=>{try{localStorage.removeItem('ultron_key_bad')}catch(e){}goodModel=null;const v=keyin.value.trim(),w=sttin.value.trim();let bad=false;
   if(w){if(/^(gsk_|sk-)/.test(w)&&!/^sk-ant-/.test(w)){try{localStorage.setItem('ultron_stt',w)}catch(e){}}else{sttin.style.borderColor='var(--red)';bad=true}}
@@ -311,6 +319,11 @@ function handle(raw){const t=norm(raw);if(!t.trim())return;attentiveUntil=perfor
     if(mode==='map'){closeMap();return say("Globe désactivé, Monsieur.")}if(mode==='body'){closeBody();return say("Hologramme désactivé, Monsieur.")}}
   if(/ (reenregistre|reconfigure|change) (mon )?visage /.test(t)){try{localStorage.removeItem('ultron_face')}catch(e){}say("Très bien, Monsieur. Regardez la caméra.");faceGate();return}
   if(bodyCmd(raw))return;
+  if(/ (hologramme )?(du )?(poids|silhouette) /.test(t)&&!/\d/.test(t)){openBody(0);return say("Hologramme du poids, Monsieur.")}
+  if(/ (hydratation|eau) /.test(t)&&!/ (bu|bois|zero|remets?) /.test(t)){openBody(1);return say("Hologramme d'hydratation, Monsieur.")}
+  if(/ (coeur|cardiaque|pouls) /.test(t)&&!/\d/.test(t)){openBody(2);return say("Hologramme cardiaque, Monsieur.")}
+  if(/ (suivant|d apres) /.test(t)&&mode==='body'){switchHolo(1);return}
+  if(/ (precedent|d avant) /.test(t)&&mode==='body'){switchHolo(-1);return}
   if(/ (sante|corps|hologramme|biometri) /.test(t)){openBody();return say("Module santé activé, Monsieur.")}
   if(/ (carte|globe|planete|mappemonde) /.test(t)&&!findCap(t)){openMap();return say("Affichage du globe, Monsieur.")}
   if(/ (taille normale|reinitialise|remets? (la carte|a zero))/.test(t)){if(mode==='body'){byaw=0;bz=0;btilt=0}else resetView();return say("Retour à la position d'origine, Monsieur.")}
@@ -453,7 +466,7 @@ function onHands(l){const now=performance.now();
   // ✋ paume ouverte : rotation dans le sens de la main
   if(pose==='open'){
     if(sp>.004){orbAng+=dx*6;orbVel=dx*3;orbTilt=Math.max(-1.2,Math.min(1.2,orbTilt+dy*4));HG.openSince=0;
-      if(mode==='map'){const g=1+zEff*7;tv.lon-=dx*240/g;tv.lat+=dy*160/g;spinV=-dx*120/g}if(mode==='body'){byaw+=dx*9;byawV=dx*3;btilt=Math.max(-1,Math.min(1,btilt+dy*3))}}
+      if(mode==='map'){const g=1+zEff*7;tv.lon-=dx*240/g;tv.lat+=dy*160/g;spinV=-dx*120/g}if(mode==='body'){if(Math.abs(dx)>.045&&now>(HG.swipeCool||0)){HG.swipeCool=now+800;switchHolo(dx<0?1:-1)}else{byaw+=dx*9;byawV=dx*3;btilt=Math.max(-1,Math.min(1,btilt+dy*3))}}}
 }}
 let camOn=false,camStream=null,handsInit=false;
 async function startCam(){if(camOn)return;const v=$('cam'),st=$('camst');st.hidden=false;st.textContent='Caméra…';
@@ -485,7 +498,7 @@ function renderStats(){const d=bdata(),i=imc(d),g=waterGoal(d),pct=Math.min(1,d.
   $('sS').textContent=d.sleep!=null?`${Math.floor(d.sleep)} h ${String(Math.round((d.sleep%1)*60)).padStart(2,'0')}`:'—';
   $('sP').textContent=d.steps.n?d.steps.n.toLocaleString('fr-FR'):'—';$('sC').textContent=d.bpm?d.bpm+' bpm':'—';
   $('sHint').textContent='Touchez une case pour la remplir, ou dites-le à Ultron.';
-  if(B){B.water=pct;B.bpm=d.bpm||64}return d}
+  if(B)updateHoloLabel();return d}
 // éditeur manuel des statistiques
 const FIELDS={
   w:{t:'POIDS',p:'Votre poids en kilos.',get:d=>d.w||'',set:(d,v)=>{if(v<25||v>300)return'Entre 25 et 300 kg.';d.w=v}},
@@ -525,74 +538,96 @@ function bodyCmd(raw){let t=raw.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/
   if(!msg)return false;bsave(d);renderStats();say(msg);return true}
 function bodySummary(){const d=bdata(),i=imc(d);return `Données de Monsieur : poids ${d.w?d.w+' kg':'inconnu'}, taille ${d.h?d.h+' m':'inconnue'}${i?', IMC '+i.toFixed(1):''}, eau bue aujourd'hui ${d.water.l} L sur un objectif de ${waterGoal(d)} L, dernier sommeil ${d.sleep!=null?d.sleep.toFixed(1)+' h':'inconnu'}, pas aujourd'hui ${d.steps.n}, cœur au repos ${d.bpm?d.bpm+' bpm':'inconnu'}.`}
 async function loadThree(){if(T)return true;try{T=await import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js');return true}catch(e){say("Je n'arrive pas à charger l'affichage 3D, Monsieur.");return false}}
-function initBody(){if(B)return;const renderer=new T.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(DPR);renderer.setSize(W,H);bodyEl.prepend(renderer.domElement);
-  const scene=new T.Scene(),camera=new T.PerspectiveCamera(35,W/H,.05,50),grp=new T.Group();grp.position.y=-.92;scene.add(grp);
-  const add=T.AdditiveBlending,uni={uTime:{value:0}};
+const HOLOS=[{k:'poids',n:'POIDS'},{k:'eau',n:'HYDRATATION'},{k:'coeur',n:'CŒUR'}];let hsel=0;
+function initBody(){if(B)return;const renderer=new T.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(DPR);renderer.setSize(W,H);renderer.localClippingEnabled=true;bodyEl.prepend(renderer.domElement);
+  const scene=new T.Scene(),camera=new T.PerspectiveCamera(35,W/H,.05,50),add=T.AdditiveBlending,uTime={value:0};
   const VS='varying vec3 vN;varying vec3 vV;varying vec3 vL;varying float vY;void main(){vL=position;vec4 w=modelMatrix*vec4(position,1.);vY=w.y;vec4 mv=viewMatrix*w;vV=-mv.xyz;vN=normalize(normalMatrix*normal);gl_Position=projectionMatrix*mv;}';
-  const FS=lines=>'uniform float uTime;varying vec3 vN;varying vec3 vV;varying vec3 vL;varying float vY;float ln(float d,float w){return exp(-d*d/(w*w));}void main(){vec3 n=normalize(vN),v=normalize(vV);float f=pow(1.-abs(dot(n,v)),2.);float edge=smoothstep(.55,1.,f);float L=0.;'+lines+
-    'float band=exp(-pow((fract(vY*.42-uTime*.22)-.5)*16.,2.));float sl=.5+.5*sin(vY*300.-uTime*2.);vec3 col=vec3(1.,.12,.18);float a=edge*1.1+f*.25+.025+L*.75+band*.18+sl*.015;gl_FragColor=vec4(col*(.3+f*.9+edge*1.6+L*1.8+band*.8)+vec3(1.,.75,.75)*edge*edge*.5,a);}';
-  const mk=lines=>new T.ShaderMaterial({uniforms:uni,transparent:true,depthWrite:false,blending:add,vertexShader:VS,fragmentShader:FS(lines)});
-  // lignes anatomiques (pectoraux, abdominaux, clavicules, aine) dessinées sur le torse
+  const FS=lines=>'uniform float uTime;uniform float uDim;uniform float uPulse;varying vec3 vN;varying vec3 vV;varying vec3 vL;varying float vY;float ln(float d,float w){return exp(-d*d/(w*w));}void main(){vec3 n=normalize(vN),v=normalize(vV);float f=pow(1.-abs(dot(n,v)),2.);float edge=smoothstep(.55,1.,f);float L=0.;'+lines+
+    'float band=exp(-pow((fract(vY*.42-uTime*.22)-.5)*16.,2.));vec3 col=vec3(1.,.12,.18);float a=(edge*1.1+f*.25+.025+L*.45+band*.15)*(1.+uPulse*.8);gl_FragColor=vec4((col*(.3+f*.9+edge*1.6+L*1.3+band*.7)+vec3(1.,.75,.75)*edge*edge*.5)*uDim,a*uDim);}';
   const torsoLines=`float fr=step(0.,vL.z);float ax=abs(vL.x);
-    L+=ln(vL.x,.0035)*fr*smoothstep(.98,1.03,vL.y)*(1.-smoothstep(1.29,1.33,vL.y));
-    L+=(ln(vL.y-1.065,.004)+ln(vL.y-1.135,.004)+ln(vL.y-1.2,.004))*step(ax,.072)*step(.006,ax)*fr*.8;
-    float px=ax-.085;L+=ln(vL.y-(1.25+2.4*px*px),.005)*step(.012,ax)*step(ax,.17)*fr;
-    L+=ln(vL.y-(1.43-.11*ax),.0045)*step(.015,ax)*step(ax,.17)*fr*.8;
-    L+=ln(vL.y-(.885+.8*ax),.005)*step(ax,.14)*fr*.75;
-    L+=ln(ax-.105,.005)*smoothstep(1.,1.05,vL.y)*(1.-smoothstep(1.2,1.25,vL.y))*fr*.5;`;
-  const kneeLines=`L+=ln(length(vec2(vL.x*1.3,vL.y+.445))-.035,.004)*step(0.,vL.z)*.9;L+=ln(vL.y+.6-.04*sin(vL.x*40.),.004)*step(vL.z,0.)*.4;`;
-  const holo=mk(''),holoTorso=mk(torsoLines),holoLeg=mk(kneeLines);
-  const halo=new T.ShaderMaterial({transparent:true,depthWrite:false,blending:add,side:T.BackSide,vertexShader:VS,
-    fragmentShader:'varying vec3 vN;varying vec3 vV;varying vec3 vL;varying float vY;void main(){float f=pow(1.-abs(dot(normalize(vN),normalize(vV))),1.4);gl_FragColor=vec4(1.,.1,.16,1.)*f*.32;}'});
-  const inner=new T.MeshBasicMaterial({color:0x6a000c,transparent:true,opacity:.06,blending:add,depthWrite:false,side:T.BackSide});
-  const V=a=>a.map(([r,y])=>new T.Vector2(r,y));
-  const lathe=(prof,seg=48)=>new T.LatheGeometry(V(prof),seg);
-  const sculpt=(g,fn)=>{const p=g.attributes.position,v=new T.Vector3();for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i);fn(v);p.setXYZ(i,v.x,v.y,v.z)}g.computeVertexNormals();return g};
+    L+=ln(vL.x,.003)*fr*smoothstep(.98,1.03,vL.y)*(1.-smoothstep(1.29,1.33,vL.y))*.8;
+    L+=(ln(vL.y-1.065,.0035)+ln(vL.y-1.135,.0035)+ln(vL.y-1.2,.0035))*step(ax,.07)*step(.006,ax)*fr*.6;
+    float px=ax-.085;L+=ln(vL.y-(1.25+2.4*px*px),.0045)*step(.012,ax)*step(ax,.16)*fr*.8;
+    L+=ln(vL.y-(1.43-.11*ax),.004)*step(.015,ax)*step(ax,.16)*fr*.6;
+    L+=ln(vL.y-(.885+.8*ax),.0045)*step(ax,.13)*fr*.55;`;
+  const kneeLines=`L+=ln(length(vec2(vL.x*1.3,vL.y+.445))-.035,.0035)*step(0.,vL.z)*.7;`;
+  const V=a=>a.map(([r,y])=>new T.Vector2(r,y));const lathe=(prof,seg=48)=>new T.LatheGeometry(V(prof),seg);
+  const sculpt=(g,fn)=>{const q=g.attributes.position,v=new T.Vector3();for(let i=0;i<q.count;i++){v.fromBufferAttribute(q,i);fn(v);q.setXYZ(i,v.x,v.y,v.z)}g.computeVertexNormals();return g};
   const bump=(x,c,w)=>Math.exp(-((x-c)*(x-c))/(w*w));
-  const put=(geo,mat,parent,x=0,y=0,z=0,sx=1,sy=1,sz=1)=>{const g=new T.Group();g.position.set(x,y,z);g.scale.set(sx,sy,sz);g.add(new T.Mesh(geo,mat));g.add(new T.Mesh(geo,inner));const h=new T.Mesh(geo,halo);h.scale.setScalar(1.035);g.add(h);parent.add(g);return g};
-  // tête avec profil du visage (nez, menton, arcades)
-  put(sculpt(lathe([[0,1.555],[.035,1.56],[.062,1.583],[.08,1.62],[.09,1.67],[.091,1.72],[.082,1.765],[.06,1.798],[.03,1.815],[0,1.818]],40),v=>{v.x*=.9;v.z*=1.12;
-      if(v.z>0){const ax=Math.abs(v.x);v.z+=.016*bump(v.y,1.665,.02)*bump(ax,0,.012)+.008*bump(v.y,1.705,.008)*bump(ax,.035,.02)+.01*bump(v.y,1.578,.014)*bump(ax,0,.03);v.x*=1-.12*bump(v.y,1.6,.03)}}),holo,grp);
-  put(lathe([[.05,1.47],[.045,1.51],[.043,1.55],[.048,1.585]],28),holo,grp,0,0,-.005,1.05,1,.9);
-  // trapèzes + torse en V : épaules larges, pectoraux, taille fine, fessiers
-  put(sculpt(lathe([[0,.835],[.09,.84],[.15,.87],[.168,.925],[.163,.985],[.145,1.045],[.13,1.1],[.135,1.15],[.15,1.22],[.162,1.29],[.168,1.35],[.166,1.4],[.15,1.432],[.115,1.458],[.07,1.475],[0,1.48]],64),v=>{
-      const y=v.y,wx=1.12+.28*bump(y,1.4,.07)+.1*bump(y,1.3,.08)-.08*bump(y,1.1,.06)+.04*bump(y,.93,.05);
-      const dz=.6+.1*bump(y,1.3,.08)-.06*bump(y,1.1,.07)+.04*bump(y,.92,.05);v.x*=wx;v.z*=dz;
-      const ax=Math.abs(v.x);if(v.z>0)v.z+=.03*bump(y,1.3,.045)*bump(ax,.085,.06);else v.z-=.03*bump(y,.92,.05)*bump(ax,.08,.06);
-      v.y+=.012*bump(ax,.12,.05)*bump(y,1.46,.03)}),holoTorso,grp);
-  // bras musclés + mains avec pouce
-  for(const sgn of[-1,1]){const arm=new T.Group();arm.position.set(sgn*.215,1.415,0);arm.rotation.z=sgn*.15;grp.add(arm);
-    put(sculpt(lathe([[0,.03],[.058,0],[.062,-.045],[.054,-.11],[.05,-.17],[.044,-.24],[.038,-.29],[.042,-.33],[.044,-.37],[.036,-.46],[.026,-.535],[0,-.545]],32),v=>{v.z*=.9;if(v.z>0)v.z+=.01*bump(v.y,-.16,.05)}),holo,arm);
-    put(sculpt(new T.SphereGeometry(.04,24,18),v=>{v.x*=.82;v.y*=1.8;v.z*=.4;if(v.y>.01)v.x*=1.08}),holo,arm,0,-.6,.006);
-    put(new T.CapsuleGeometry(.011,.035,4,10),holo,arm,sgn*.03,-.57,.02,1,1,1).rotation.z=sgn*.5;
-  // jambes : quadriceps, genou, mollet, cheville + pieds
-    put(sculpt(lathe([[0,.02],[.085,0],[.09,-.06],[.085,-.17],[.072,-.3],[.054,-.41],[.05,-.455],[.056,-.52],[.06,-.575],[.048,-.69],[.032,-.8],[.03,-.835],[0,-.845]],40),v=>{v.z*=.95;if(v.z>0)v.z+=.012*bump(v.y,-.2,.08);else v.z-=.014*bump(v.y,-.57,.06)}),holoLeg,grp,sgn*.092,.915,0);
-    put(sculpt(new T.SphereGeometry(.05,24,14),v=>{v.x*=.82;v.y*=.5;v.z*=2.1;if(v.y<0)v.y*=.4}),holo,grp,sgn*.098,.03,.045)}
-  // cœur lumineux qui bat au rythme saisi
-  const heart=new T.Mesh(new T.SphereGeometry(.024,16,12),new T.MeshBasicMaterial({color:0xff3044,transparent:true,opacity:.9,blending:add,depthWrite:false}));heart.position.set(.035,1.3,.04);grp.add(heart);
-  heart.add(new T.Mesh(new T.SphereGeometry(.065,16,12),new T.MeshBasicMaterial({color:0xff1030,transparent:true,opacity:.16,blending:add,depthWrite:false})));
-  // niveau d'eau dans le torse
-  const water=new T.Mesh(new T.CylinderGeometry(.13,.13,1,32,1,true),new T.MeshBasicMaterial({color:0x3fd6ff,transparent:true,opacity:.14,blending:add,depthWrite:false,side:T.DoubleSide}));grp.add(water);
-  // socle holographique, faisceau et anneau de scan
+  // géométries partagées par les trois hologrammes (profils ouverts : plus de disques plats)
+  const GEO={
+    head:sculpt(lathe([[0,1.555],[.035,1.56],[.062,1.583],[.08,1.62],[.09,1.67],[.091,1.72],[.082,1.765],[.06,1.798],[.03,1.815],[0,1.818]],40),v=>{v.x*=.9;v.z*=1.12;if(v.z>0){const ax=Math.abs(v.x);v.z+=.016*bump(v.y,1.665,.02)*bump(ax,0,.012)+.008*bump(v.y,1.705,.008)*bump(ax,.035,.02)+.01*bump(v.y,1.578,.014)*bump(ax,0,.03);v.x*=1-.12*bump(v.y,1.6,.03)}}),
+    neck:lathe([[.05,1.47],[.045,1.51],[.043,1.55],[.048,1.585]],28),
+    torso:sculpt(lathe([[.05,.86],[.1,.85],[.15,.875],[.168,.925],[.163,.985],[.145,1.045],[.13,1.1],[.135,1.15],[.15,1.22],[.162,1.29],[.168,1.35],[.166,1.4],[.15,1.432],[.115,1.458],[.07,1.475],[0,1.48]],64),v=>{
+      const y=v.y,wx=1.12+.28*bump(y,1.4,.07)+.1*bump(y,1.3,.08)-.08*bump(y,1.1,.06)+.04*bump(y,.93,.05),dz=.6+.1*bump(y,1.3,.08)-.06*bump(y,1.1,.07)+.04*bump(y,.92,.05);v.x*=wx;v.z*=dz;
+      const ax=Math.abs(v.x);if(v.z>0)v.z+=.028*bump(y,1.3,.045)*bump(ax,.085,.06);else v.z-=.022*bump(y,.93,.05)*bump(ax,.08,.06);v.y+=.012*bump(ax,.12,.05)*bump(y,1.46,.03)}),
+    arm:sculpt(lathe([[.045,.035],[.058,0],[.062,-.045],[.054,-.11],[.05,-.17],[.044,-.24],[.038,-.29],[.042,-.33],[.044,-.37],[.036,-.46],[.026,-.535],[0,-.545]],32),v=>{v.z*=.9;if(v.z>0)v.z+=.01*bump(v.y,-.16,.05)}),
+    hand:sculpt(new T.SphereGeometry(.04,24,18),v=>{v.x*=.82;v.y*=1.8;v.z*=.4;if(v.y>.01)v.x*=1.08}),
+    thumb:new T.CapsuleGeometry(.011,.035,4,10),
+    leg:sculpt(lathe([[.07,.03],[.085,0],[.09,-.06],[.085,-.17],[.072,-.3],[.054,-.41],[.05,-.455],[.056,-.52],[.06,-.575],[.048,-.69],[.032,-.8],[.03,-.835],[0,-.845]],40),v=>{v.z*=.95;if(v.z>0)v.z+=.012*bump(v.y,-.2,.08);else v.z-=.014*bump(v.y,-.57,.06)}),
+    foot:sculpt(new T.SphereGeometry(.05,24,14),v=>{v.x*=.82;v.y*=.5;v.z*=2.1;if(v.y<0)v.y*=.4}),
+    belly:new T.SphereGeometry(.12,32,24)};
+  function buildBody(kind){
+    const U={uTime,uDim:{value:1},uPulse:{value:0}};
+    const mk=lines=>new T.ShaderMaterial({uniforms:U,transparent:true,depthWrite:false,blending:add,vertexShader:VS,fragmentShader:FS(lines)});
+    const M={holo:mk(''),torso:mk(torsoLines),leg:mk(kneeLines),
+      halo:new T.ShaderMaterial({uniforms:U,transparent:true,depthWrite:false,blending:add,side:T.BackSide,vertexShader:VS,fragmentShader:'uniform float uDim;varying vec3 vN;varying vec3 vV;varying vec3 vL;varying float vY;void main(){float f=pow(1.-abs(dot(normalize(vN),normalize(vV))),1.4);gl_FragColor=vec4(1.,.1,.16,1.)*f*.3*uDim;}'}),
+      inner:new T.MeshBasicMaterial({color:0x6a000c,transparent:true,opacity:.06,blending:add,depthWrite:false,side:T.BackSide})};
+    const clip=new T.Plane(new T.Vector3(0,-1,0),-10);
+    const waterM=kind==='eau'?new T.MeshBasicMaterial({color:0x2fc8ff,transparent:true,opacity:.32,blending:add,depthWrite:false,side:T.DoubleSide,clippingPlanes:[clip]}):null;
+    const root=new T.Group(),grp=new T.Group();grp.position.y=-.92;root.add(grp);const girth=[];
+    const put=(geo,mat,parent,x=0,y=0,z=0,sx=1,sy=1,sz=1)=>{const g=new T.Group();g.position.set(x,y,z);g.scale.set(sx,sy,sz);g.add(new T.Mesh(geo,mat));g.add(new T.Mesh(geo,M.inner));const h=new T.Mesh(geo,M.halo);h.scale.setScalar(1.035);g.add(h);if(waterM)g.add(new T.Mesh(geo,waterM));parent.add(g);return g};
+    put(GEO.head,M.holo,grp);put(GEO.neck,M.holo,grp,0,0,-.005,1.05,1,.9);
+    const torso=put(GEO.torso,M.torso,grp);girth.push(torso);const arms=[];
+    for(const sgn of[-1,1]){const arm=new T.Group();arm.position.set(sgn*.215,1.415,0);arm.rotation.z=sgn*.15;grp.add(arm);arms.push([arm,sgn]);
+      girth.push(put(GEO.arm,M.holo,arm));put(GEO.hand,M.holo,arm,0,-.6,.006);put(GEO.thumb,M.holo,arm,sgn*.03,-.57,.02).rotation.z=sgn*.5;
+      girth.push(put(GEO.leg,M.leg,grp,sgn*.092,.915,0));put(GEO.foot,M.holo,grp,sgn*.098,.03,.045)}
+    let belly=null,heart=null;
+    if(kind==='poids'){belly=put(GEO.belly,M.holo,grp,0,1.06,.02,1,.9,.1);}
+    if(kind==='coeur'){heart=new T.Group();heart.position.set(.03,1.3,.045);grp.add(heart);
+      const hm=new T.MeshBasicMaterial({color:0xff2a40,transparent:true,opacity:.95,blending:add,depthWrite:false});
+      const l=new T.Mesh(new T.SphereGeometry(.024,20,16),hm);l.position.set(-.017,.012,0);const r=l.clone();r.position.x=.017;
+      const c=new T.Mesh(new T.ConeGeometry(.036,.06,24),hm);c.rotation.z=Math.PI;c.position.y=-.024;heart.add(l,r,c);
+      heart.add(new T.Mesh(new T.SphereGeometry(.1,20,16),new T.MeshBasicMaterial({color:0xff1030,transparent:true,opacity:.14,blending:add,depthWrite:false})));
+      heart.rotation.z=-.35}
+    return{kind,root,grp,U,girth,arms,belly,heart,clip,g:1,yaw:0}}
+  const bodies=HOLOS.map(h=>{const b=buildBody(h.k);scene.add(b.root);return b});
+  // socle holographique + scan sous l'hologramme principal
+  const base=new T.Group();base.position.y=-.92;scene.add(base);
   const ringM=new T.MeshBasicMaterial({color:0xff2a3d,transparent:true,opacity:.5,blending:add,depthWrite:false,side:T.DoubleSide});
-  const rings=[];for(const[r1,r2,o]of[[.26,.275,.7],[.34,.343,.35],[.44,.445,.25],[.5,.502,.15]]){const m=new T.Mesh(new T.RingGeometry(r1,r2,96),ringM.clone());m.material.opacity=o;m.rotation.x=-Math.PI/2;m.position.y=.003;grp.add(m);rings.push(m)}
-  const beam=new T.Mesh(new T.CylinderGeometry(.26,.46,1.95,64,1,true),new T.MeshBasicMaterial({color:0xff2a3d,transparent:true,opacity:.02,blending:add,depthWrite:false,side:T.DoubleSide}));beam.position.y=.97;grp.add(beam);
-  const scan=new T.Mesh(new T.RingGeometry(.0,.36,64),new T.MeshBasicMaterial({color:0xff4050,transparent:true,opacity:.1,blending:add,depthWrite:false,side:T.DoubleSide}));scan.rotation.x=-Math.PI/2;grp.add(scan);
-  B={renderer,scene,camera,grp,rings,scan,uni,heart,water:0,bpm:64,waterMesh:water};renderStats()}
-async function openBody(){if(mode==='body')return;if(mode==='map'){instantCloseMap()}if(!await loadThree())return;initBody();const p0=orbPos();mode='body';byaw=0;bz=0;btilt=0;bodyUI.hidden=false;renderStats();
+  const rings=[];for(const[r1,r2,o]of[[.26,.275,.7],[.34,.343,.35],[.44,.445,.25],[.5,.502,.15]]){const m=new T.Mesh(new T.RingGeometry(r1,r2,96),ringM.clone());m.material.opacity=o;m.rotation.x=-Math.PI/2;m.position.y=.003;base.add(m);rings.push(m)}
+  const beam=new T.Mesh(new T.CylinderGeometry(.26,.46,1.95,64,1,true),new T.MeshBasicMaterial({color:0xff2a3d,transparent:true,opacity:.02,blending:add,depthWrite:false,side:T.DoubleSide}));beam.position.y=.97;base.add(beam);
+  const scan=new T.Mesh(new T.RingGeometry(.0,.36,64),new T.MeshBasicMaterial({color:0xff4050,transparent:true,opacity:.1,blending:add,depthWrite:false,side:T.DoubleSide}));scan.rotation.x=-Math.PI/2;base.add(scan);
+  B={renderer,scene,camera,bodies,rings,scan,uTime,water:0,bpm:64,imc:null};renderStats();updateHoloLabel()}
+function switchHolo(dir,abs){hsel=abs!=null?abs:(hsel+dir+3)%3;byaw=0;updateHoloLabel()}
+function updateHoloLabel(){const el=$('hlbl');if(!el)return;const d=bdata(),i=imc(d),k=HOLOS[hsel].k;
+  $('hlt').textContent=HOLOS[hsel].n;
+  $('hlv').textContent=k==='poids'?(d.w?fr(d.w)+' kg'+(i?' · IMC '+fr(i):''):'Poids non renseigné'):k==='eau'?`${fr(d.water.l,2)} / ${fr(waterGoal(d))} L`:(d.bpm?d.bpm+' bpm':'64 bpm (par défaut)')}
+async function openBody(sel){if(sel!=null)switchHolo(0,sel);if(mode==='body')return;if(mode==='map'){instantCloseMap()}if(!await loadThree())return;initBody();const p0=orbPos();mode='body';byaw=0;bz=0;btilt=0;bodyUI.hidden=false;$('hlbl').hidden=false;renderStats();updateHoloLabel();
   breveal={t0:performance.now(),d:reduce?1:1400,x:p0.x,y:p0.y,dir:1};place()}
-function closeBody(){if(mode!=='body')return;const p=orbPos();breveal={t0:performance.now(),d:reduce?1:800,x:p.x,y:p.y,dir:-1};mode='closing-body';bodyUI.hidden=true}
-function instantCloseBody(){if(mode!=='body')return;bodyEl.style.clipPath='circle(0px at 50% 50%)';bodyUI.hidden=true;breveal=null;mode='idle'}
+function closeBody(){if(mode!=='body')return;const p=orbPos();breveal={t0:performance.now(),d:reduce?1:800,x:p.x,y:p.y,dir:-1};mode='closing-body';bodyUI.hidden=true;$('hlbl').hidden=true}
+function instantCloseBody(){if(mode!=='body')return;bodyEl.style.clipPath='circle(0px at 50% 50%)';bodyUI.hidden=true;$('hlbl').hidden=true;breveal=null;mode='idle'}
 function renderBody(t){if(!B)return;
   if(breveal){const k=Math.min(1,(t-breveal.t0)/breveal.d),e=breveal.dir>0?1-Math.pow(1-k,3):1-k*k*k;bodyEl.style.clipPath=`circle(${e*Math.hypot(W,H)}px at ${breveal.x}px ${breveal.y}px)`;
     if(k>=1){if(breveal.dir<0){mode='idle';place()}else bodyEl.style.clipPath='none';breveal=null}}
   if(mode!=='body'&&mode!=='closing-body')return;
-  if(t-lastInput>3000&&!reduce)byaw+=.004;byaw+=byawV;byawV*=.92;bzEff+=(bz-bzEff)*.1;btiltEff+=(btilt-btiltEff)*.1;
-  B.grp.rotation.y=byaw;B.grp.rotation.x=btiltEff*.35;
-  const dist=5.4+(1.9-5.4)*bzEff;B.camera.position.set(0,.2-bzEff*.1,dist);B.camera.lookAt(0,.42-bzEff*.35,0);
-  const pct=B.water||0,h=Math.max(.001,.55*pct);B.waterMesh.scale.set(1.15,h,.6);B.waterMesh.position.y=.9+h/2;
-  B.rings.forEach((r,i)=>r.rotation.z=t/1000*(i%2?-.4:.6));const sy=(t/2600%1);B.scan.position.y=sy*1.9;B.scan.material.opacity=.14*Math.sin(sy*Math.PI);
-  B.uni.uTime.value=t/1000;const hb=(t/1000*(B.bpm||64)/60)%1,beat=Math.exp(-hb*9)+.6*Math.exp(-Math.pow((hb-.18)*12,2));B.heart.scale.setScalar(1+beat*.45);
+  if(t-lastInput>3000&&!reduce)byaw+=.004;byaw+=byawV;byawV*=.92;bzEff+=(bz-bzEff)*.1;btiltEff+=(btilt-btiltEff)*.1;const ts=t/1000;B.uTime.value=ts;
+  // cadrage : l'hologramme tient entre les statistiques et le bas de l'écran
+  const top=(bodyUI.hidden?0:bodyUI.getBoundingClientRect().bottom)+46,bot=H-24,rh=Math.max(160,bot-top),th=Math.tan(17.5*R);
+  const d0=1.95*H/(rh*.92*2*th),dist=d0+(d0*.38-d0)*bzEff;B.camera.position.set(0,bzEff*.35,dist);B.camera.lookAt(0,bzEff*.35,0);
+  B.camera.setViewOffset(W,H,0,-((top+bot)/2-H/2),W,H);$('hlbl').style.top=(top-40)+'px';
+  // carrousel : l'hologramme choisi devant, les deux autres en retrait
+  const d=bdata(),i=imc(d),pct=Math.min(1,d.water.l/waterGoal(d)),bpm=d.bpm||64,hb=(ts*bpm/60)%1,beat=Math.exp(-hb*9)+.6*Math.exp(-Math.pow((hb-.18)*12,2));
+  B.bodies.forEach((b,idx)=>{let o=((idx-hsel)%3+3)%3;if(o===2)o=-1;const front=o===0;
+    const tx=o*.95,tz=-Math.abs(o)*1.4,sc=front?1:.78;b.root.position.x+=(tx-b.root.position.x)*.12;b.root.position.z+=(tz-b.root.position.z)*.12;
+    const cs=b.root.scale.x+(sc-b.root.scale.x)*.12;b.root.scale.setScalar(cs);b.U.uDim.value+=((front?1:.3)-b.U.uDim.value)*.12;
+    b.yaw=front?byaw:b.yaw+.006;b.root.rotation.y=b.yaw;b.root.rotation.x=front?btiltEff*.35:0;
+    if(b.kind==='poids'){const tg=i?Math.max(.82,Math.min(1.6,1+(i-22)*.045)):1;b.g+=(tg-b.g)*.06;
+      b.girth.forEach((g,j)=>{g.scale.x=j===0?b.g:1+(b.g-1)*.7;g.scale.z=j===0?b.g:1+(b.g-1)*.7});b.arms.forEach(([a,sgn])=>a.position.x=sgn*.215*(1+(b.g-1)*.85));
+      const bl=Math.max(0,b.g-1.04);b.belly.visible=bl>0;b.belly.scale.set(1+bl*.8,.9+bl*.5,.1+bl*2.4)}
+    if(b.kind==='eau'){const lvl=-.92+.02+1.8*pct+(pct>0?Math.sin(ts*2)*.006:0);b.clip.constant=pct>0?lvl:-10}
+    if(b.kind==='coeur'){b.heart.scale.setScalar(1+beat*.55);b.U.uPulse.value=beat*.35}});
+  const fb=B.bodies[hsel].root;B.rings.forEach((r,k)=>r.rotation.z=ts*(k%2?-.4:.6));const sy=(t/2600%1);B.scan.position.y=sy*1.9;B.scan.material.opacity=.14*Math.sin(sy*Math.PI);
   B.renderer.render(B.scene,B.camera)}
 function instantCloseMap(){if(mode!=='map')return;hideCard();globeEl.style.clipPath='circle(0px at 50% 50%)';reveal=null;labelsEl.querySelectorAll('.lbl').forEach(l=>l.hidden=true);mode='idle'}
 
@@ -643,16 +678,18 @@ lockEl.addEventListener('pointerdown',e=>{e.stopPropagation();if(!camOn)startCam
 lockEl.addEventListener('pointerup',e=>e.stopPropagation());
 
 // ───────── toucher
-const ptrs=new Map();let pz=null,downAt=null,moved=false,lastTap=0,lpT=null;
+const ptrs=new Map();let downT=0,pz=null,downAt=null,moved=false,lastTap=0,lpT=null;
 const pos=e=>({x:e.clientX,y:e.clientY});
-app.addEventListener('pointerdown',e=>{if(locked)return;if(e.target.closest('.convo,.modal,.st'))return;try{app.setPointerCapture(e.pointerId)}catch(_){}ptrs.set(e.pointerId,pos(e));lastInput=performance.now();
-  if(ptrs.size===1){downAt=pos(e);moved=false}else if(ptrs.size===2){const[a,b]=[...ptrs.values()];pz={d:Math.hypot(a.x-b.x,a.y-b.y)};moved=true}});
+app.addEventListener('pointerdown',e=>{if(locked)return;if(e.target.closest('.convo,.modal,.st,.hlbl'))return;try{app.setPointerCapture(e.pointerId)}catch(_){}ptrs.set(e.pointerId,pos(e));lastInput=performance.now();
+  if(ptrs.size===1){downAt=pos(e);downT=performance.now();moved=false}else if(ptrs.size===2){const[a,b]=[...ptrs.values()];pz={d:Math.hypot(a.x-b.x,a.y-b.y)};moved=true}});
 app.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const o=ptrs.get(e.pointerId),p=pos(e);ptrs.set(e.pointerId,p);lastInput=performance.now();
   if(mode==='body'){if(ptrs.size===1){if(Math.hypot(p.x-downAt.x,p.y-downAt.y)>8)moved=true;byaw+=(p.x-o.x)/W*6;btilt=Math.max(-1,Math.min(1,btilt+(p.y-o.y)/H*3))}else if(ptrs.size===2&&pz){const[a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y);bz=Math.max(0,Math.min(1,bz+Math.log(d/pz.d)*.7));pz.d=d}return}
   if(mode!=='map')return;
   if(ptrs.size===1){if(Math.hypot(p.x-downAt.x,p.y-downAt.y)>8)moved=true;const g=1+zEff*7;tv.lon-=(p.x-o.x)/W*160/g;tv.lat+=(p.y-o.y)/H*120/g}
   else if(ptrs.size===2&&pz){const[a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y);z=Math.max(0,Math.min(1,z+Math.log(d/pz.d)*.7));pz.d=d}});
-const up=e=>{if(!ptrs.has(e.pointerId))return;ptrs.delete(e.pointerId);if(ptrs.size<2)pz=null;if(moved||e.type==='pointercancel')return;
+const up=e=>{if(!ptrs.has(e.pointerId))return;ptrs.delete(e.pointerId);if(ptrs.size<2)pz=null;
+  if(mode==='body'&&moved&&downAt&&ptrs.size===0&&performance.now()-downT<380&&Math.abs(e.clientX-downAt.x)>70&&Math.abs(e.clientX-downAt.x)>Math.abs(e.clientY-downAt.y)*1.5){switchHolo(e.clientX<downAt.x?1:-1);return}
+  if(moved||e.type==='pointercancel')return;
   const p=pos(e),n=performance.now();if(n-lastTap<300&&(mode==='map'||mode==='body')){lastTap=0;if(mode==='map')resetView();else{byaw=0;bz=0;btilt=0}return}lastTap=n;
   if(STT.ctx&&STT.ctx.state!=='running'){STT.ctx.resume().then(()=>{needTap=false;setConvo();showHeard('🎙 À l\'écoute…',false)})}
   if(!started){start();return}if(!camOn)startCam();if(needTap||(!micOn&&!userMicOff&&SR)){needTap=false;micOn=true;setConvo();recStart();return}const o=orbPos();if(Math.hypot(p.x-o.x,p.y-o.y)<110*o.k)micToggle()};
