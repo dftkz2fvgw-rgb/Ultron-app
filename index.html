@@ -3,6 +3,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="ULTRON"><meta name="theme-color" content="#030406">
 <title>ULTRON</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -29,6 +30,14 @@ html,body{height:100%;margin:0;background:var(--void);color:var(--ink);font-fami
 .convo.live{box-shadow:0 0 0 1px rgba(255,42,61,.35),0 0 18px rgba(255,42,61,.25)}
 .convo.think i{background:#ffb35c;box-shadow:0 0 8px #ffb35c}
 @keyframes blink{50%{opacity:.3}}
+#street{position:absolute;inset:0;z-index:1;opacity:0;transition:opacity .6s;background:#030406}
+#street.on{opacity:1}
+#street .leaflet-tile-pane{filter:sepia(.45) hue-rotate(-28deg) saturate(2.2) brightness(1.05) contrast(1.08)}
+#street .leaflet-control-attribution{background:rgba(0,0,0,.55);color:#888;font:9px var(--mono)}
+#street .leaflet-control-attribution a{color:#b55}
+#street::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:500;background:radial-gradient(120% 85% at 50% 45%,transparent 55%,rgba(0,0,0,.75) 100%),repeating-linear-gradient(0deg,rgba(255,40,60,.035) 0 1px,transparent 1px 3px)}
+.splace{position:absolute;z-index:6;top:calc(14px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);max-width:calc(100% - 32px);padding:8px 14px;border-radius:12px;background:rgba(10,12,17,.75);border:1px solid var(--hair);border-left:2px solid var(--red);font:500 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.splace[hidden]{display:none}
 .heard{position:absolute;z-index:5;left:calc(116px + env(safe-area-inset-left,0px));right:120px;bottom:calc(70px + env(safe-area-inset-bottom,0px));font:400 12px/1.4 var(--mono);color:var(--dim);opacity:0;transition:opacity .3s;pointer-events:none;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .heard.show{opacity:.85}.heard.final{color:var(--ink)}
 .card{position:absolute;z-index:6;top:calc(16px + env(safe-area-inset-top,0px));left:50%;width:min(360px,calc(100% - 32px));transform:translate(-50%,-14px);opacity:0;transition:opacity .35s,transform .35s;
@@ -101,6 +110,8 @@ body:has(.night.on) .fx{opacity:0}
 </style></head><body>
 <div id="app">
   <div id="globe"><div id="labels"></div></div>
+  <div id="street" hidden></div>
+  <div class="splace" id="splace" hidden></div>
   <div id="body3d"></div>
   <div class="hlbl" id="hlbl" hidden><button id="hlp" aria-label="Précédent">‹</button><div><b id="hlt">POIDS</b><span id="hlv"></span></div><button id="hln" aria-label="Suivant">›</button></div>
   <div class="bui" id="bodyUI" hidden>
@@ -282,7 +293,7 @@ modal.addEventListener('pointerdown',e=>e.stopPropagation());
 const SYS=()=>`Tu es ULTRON, l'intelligence artificielle personnelle de ton créateur, que tu appelles toujours « Monsieur » et que tu vouvoies. Tu parles comme l'Ultron des films : voix posée, phrases élégantes et un peu théâtrales, une pointe d'ironie froide et de grandeur, mais une loyauté absolue envers Monsieur. Nous sommes le ${new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}, il est ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}.
 Tes réponses sont lues à voix haute : réponds en français comme dans une vraie conversation orale entre deux personnes : naturel, fluide, une à trois phrases courtes, sans markdown, sans liste, sans emoji. Si Monsieur pose une question de suivi, garde le fil de la conversation.
 ${bodySummary()}
-Tu contrôles un globe terrestre en 3D et un hologramme biométrique de Monsieur (s'il veut le voir, ajoute [CORPS] ; c'est le module « santé »). Si Monsieur veut voir la carte, ajoute [CARTE] à la fin. S'il veut la fermer, ajoute [FERMER]. S'il veut voir une capitale ou un pays, ajoute [LIEU:nom de la capitale en français].`;
+Tu contrôles un globe terrestre en 3D (qui peut zoomer jusqu'aux rues : pour montrer un lieu précis ajoute [RUE:nom du lieu]) et un hologramme biométrique de Monsieur (s'il veut le voir, ajoute [CORPS] ; c'est le module « santé »). Si Monsieur veut voir la carte, ajoute [CARTE] à la fin. S'il veut la fermer, ajoute [FERMER]. S'il veut voir une capitale ou un pays, ajoute [LIEU:nom de la capitale en français].`;
 const MODELS=['claude-haiku-5-5','claude-sonnet-5-5','claude-haiku-4-5','claude-sonnet-4-5'];let goodModel=null;
 async function askClaude(text){const key=findKey();if(!key){say("Pour converser librement, Monsieur, j'ai besoin de votre clé Claude.");askKey();return}
   history.push({role:'user',content:text});history=history.slice(-12);while(history.length&&history[0].role!=='user')history.shift();
@@ -304,7 +315,7 @@ async function askClaude(text){const key=findKey();if(!key){say("Pour converser 
     const j=await r.json();const t=(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join(' ').trim();history.push({role:'assistant',content:t||'…'});
     thinking=false;setConvo();
     if(/\[CARTE\]/i.test(t))openMap();if(/\[FERMER\]/i.test(t)){closeMap();closeBody()}if(/\[CORPS\]/i.test(t))openBody();
-    const m=t.match(/\[LIEU:\s*([^\]]+)\]/i);if(m){const c=findCap(norm(m[1]));if(c)goCap(c)}
+    const mr=t.match(/\[RUE:\s*([^\]]+)\]/i);if(mr)geocode(mr[1]).then(g=>{if(g)openStreet(g.lat,g.lon,15,g.bbox,g.name)});const m=t.match(/\[LIEU:\s*([^\]]+)\]/i);if(m){const c=findCap(norm(m[1]));if(c)goCap(c)}
     const spoken=t.replace(/\[[^\]]*\]/g,'').trim();if(spoken)say(spoken);else setTimeout(recStart,200)}
   catch(e){fail(e.name==='AbortError'?'Claude ne répond pas (délai dépassé)':'Connexion à Claude impossible : '+e.message,e.name==='AbortError'?"Claude met trop de temps à répondre, Monsieur.":"Je n'arrive pas à joindre Claude, Monsieur. Vérifiez la connexion.")}}
 const findCap=t=>CAPS.find(c=>t.includes(norm(c.n))||t.includes(norm(c.c)));
@@ -327,7 +338,10 @@ function handle(raw){const t=norm(raw);if(!t.trim())return;attentiveUntil=perfor
   if(/ (sante|corps|hologramme|biometri) /.test(t)){openBody();return say("Module santé activé, Monsieur.")}
   if(/ (carte|globe|planete|mappemonde) /.test(t)&&!findCap(t)){openMap();return say("Affichage du globe, Monsieur.")}
   if(/ (taille normale|reinitialise|remets? (la carte|a zero))/.test(t)){if(mode==='body'){byaw=0;bz=0;btilt=0}else resetView();return say("Retour à la position d'origine, Monsieur.")}
-  if(/ (montre|va |zoom|emmene|direction|ou est|ou se trouve)/.test(t)){const c=findCap(t);if(c){goCap(c);return}}
+  if(/ (montre|va |vas |zoom|emmene|direction|ou est|ou se trouve|cherche|affiche)/.test(t)){const c=findCap(t),detail=/ (rue|rues|ruelle|quartier|detail|plan|zoom)/.test(t);
+    if(c&&!detail){goCap(c);return}
+    const q=raw.replace(/^(.*?\b(montre[- ]moi|montre|va [aà]|va au|va aux|vas [aà]|emm[eè]ne[- ]moi [aà]|emm[eè]ne[- ]moi|zoome? sur|cherche|affiche|o[uù] est|o[uù] se trouve|direction))\s*/i,'').replace(/\b(les |la |le |l')?(rues?|ruelles?|quartiers?|plan|en d[eé]tail)\s*(de |du |des |d')?/gi,'').replace(/[?.!]/g,'').trim();
+    if(q.length>1&&(detail||!c)){showHeard('🔎 '+q,false);geocode(q).then(g=>{if(!g){say("Je ne trouve pas cet endroit, Monsieur.");return}openStreet(g.lat,g.lon,15,g.bbox,g.name);say(`${g.name.split(',')[0]}, Monsieur.`)});return}}
   askClaude(raw)}
 
 // ───────── orbe : position
@@ -404,7 +418,7 @@ const dDef=()=>1/Math.sin(Math.atan(Math.tan(20*R)*(W/H)*.9));const D_MIN=1.12;
 function resetView(){tv.lon=2;tv.lat=22;z=0;lastInput=performance.now();hideCard()}
 function goCap(c){if(mode!=='map')openMap();tv.lon=c.lo;tv.lat=c.la;z=.92;lastInput=performance.now()}
 async function openMap(){if(mode==='map')return;if(mode==='body')instantCloseBody();if(!await initGlobe())return;const p=orbPos();mode='map';resetView();view.lon=tv.lon;view.lat=tv.lat;zEff=0;reveal={t0:performance.now(),d:reduce?1:1500,x:p.x,y:p.y,dir:1};place();HG.pd=0}
-function closeMap(){if(mode!=='map')return;hideCard();const p=orbPos();reveal={t0:performance.now(),d:reduce?1:900,x:p.x,y:p.y,dir:-1};mode='closing'}
+function closeMap(){if(mode!=='map')return;closeStreet();hideCard();const p=orbPos();reveal={t0:performance.now(),d:reduce?1:900,x:p.x,y:p.y,dir:-1};mode='closing'}
 function renderGlobe(t){if(!G)return;
   if(reveal){const k=Math.min(1,(t-reveal.t0)/reveal.d),e=reveal.dir>0?1-Math.pow(1-k,3):1-k*k*k,r=e*Math.hypot(W,H);globeEl.style.clipPath=`circle(${r}px at ${reveal.x}px ${reveal.y}px)`;
     if(k>=1){if(reveal.dir<0){mode='idle';place();labelsEl.querySelectorAll('.lbl').forEach(l=>l.hidden=true)}else globeEl.style.clipPath='none';reveal=null}}
@@ -414,6 +428,7 @@ function renderGlobe(t){if(!G)return;
   tv.lat=Math.max(-75,Math.min(75,tv.lat));
   let dl=((tv.lon-view.lon+540)%360)-180;view.lon+=dl*.14;view.lat+=(tv.lat-view.lat)*.14;zEff+=(z-zEff)*.1;
   const v0=vec(view.lon,0);G.group.rotation.set(view.lat*R,Math.atan2(-v0[0],v0[2]),0);
+  if(mode==='map'&&!streetOn&&z>=1&&zEff>.97&&!G.streetT){G.streetT=1;openStreet(view.lat,view.lon,6.2,null,'Vue des rues').finally(()=>{G.streetT=0})}
   const dd=dDef(),dist=1+(dd-1)*Math.pow((D_MIN-1)/(dd-1),zEff);G.camera.position.set(0,0,dist);G.camera.lookAt(0,0,0);
   G.renderer.render(G.scene,G.camera);
   // étiquettes
@@ -457,16 +472,16 @@ function onHands(l){const now=performance.now();
   const pose=HG.pose;
   // ✊ poing : retour à l'origine
   if(pose==='fist'){if(!HG.fistDone&&now-HG.since>500){HG.fistDone=true;
-      if(mode==='map'){resetView();spinV=0}if(mode==='body'){byaw=0;bz=0;btilt=0;byawV=0}orbKt=1;orbTilt=0;orbVel=0}return}
+      if(mode==='map'){closeStreet();resetView();spinV=0}if(mode==='body'){byaw=0;bz=0;btilt=0;byawV=0}orbKt=1;orbTilt=0;orbVel=0}return}
   // 🤏 pince : écarter = agrandir, rapprocher = rétrécir (la taille reste quand on lâche)
   if(pose==='pinch'){const pd=Math.hypot(l[4].x-l[8].x,l[4].y-l[8].y)/size;
     if(HG.pd>0){const f=pd/HG.pd;if(Math.abs(f-1)>.015){const k=Math.log(f);
-      if(mode==='map')z=Math.max(0,Math.min(1,z+k*.9));else if(mode==='body')bz=Math.max(0,Math.min(1,bz+k*.9));else if(mode==='idle')orbKt=Math.max(.5,Math.min(1.8,orbKt*Math.exp(k*1.1)))}}
+      if(mode==='map'&&streetOn&&SM)SM.setZoom(Math.max(3,Math.min(19,SM.getZoom()+k*3.2)),{animate:false});else if(mode==='map')z=Math.max(0,Math.min(1,z+k*.9));else if(mode==='body')bz=Math.max(0,Math.min(1,bz+k*.9));else if(mode==='idle')orbKt=Math.max(.5,Math.min(1.8,orbKt*Math.exp(k*1.1)))}}
     HG.pd=HG.pd?HG.pd+(pd-HG.pd)*.6:pd;return}
   // ✋ paume ouverte : rotation dans le sens de la main
   if(pose==='open'){
     if(sp>.004){orbAng+=dx*6;orbVel=dx*3;orbTilt=Math.max(-1.2,Math.min(1.2,orbTilt+dy*4));HG.openSince=0;
-      if(mode==='map'){const g=1+zEff*7;tv.lon-=dx*240/g;tv.lat+=dy*160/g;spinV=-dx*120/g}if(mode==='body'){if(Math.abs(dx)>.045&&now>(HG.swipeCool||0)){HG.swipeCool=now+800;switchHolo(dx<0?1:-1)}else{byaw+=dx*9;byawV=dx*3;btilt=Math.max(-1,Math.min(1,btilt+dy*3))}}}
+      if(mode==='map'&&streetOn&&SM)SM.panBy([-dx*W*1.6,-dy*H*1.3],{animate:false});else if(mode==='map'){const g=1+zEff*7;tv.lon-=dx*240/g;tv.lat+=dy*160/g;spinV=-dx*120/g}if(mode==='body'){if(Math.abs(dx)>.045&&now>(HG.swipeCool||0)){HG.swipeCool=now+800;switchHolo(dx<0?1:-1)}else{byaw+=dx*9;byawV=dx*3;btilt=Math.max(-1,Math.min(1,btilt+dy*3))}}}
 }}
 let camOn=false,camStream=null,handsInit=false;
 async function startCam(){if(camOn)return;const v=$('cam'),st=$('camst');st.hidden=false;st.textContent='Caméra…';
@@ -677,10 +692,26 @@ lockBtn.addEventListener('click',e=>{e.stopPropagation();startCam();faceGate()})
 lockEl.addEventListener('pointerdown',e=>{e.stopPropagation();if(!camOn)startCam()});
 lockEl.addEventListener('pointerup',e=>e.stopPropagation());
 
+
+// ───────── rues et quartiers (zoom au maximum sur le globe, ou « montre-moi … »)
+const streetEl=$('street'),splace=$('splace');let SM=null,streetOn=false;
+function loadLeaflet(){if(window.L)return Promise.resolve(true);return new Promise(r=>{const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';sc.onload=()=>r(true);sc.onerror=()=>r(false);document.head.appendChild(sc)})}
+async function openStreet(lat,lon,zoom,bbox,label){if(!await loadLeaflet()){say("Je n'arrive pas à charger les rues, Monsieur.");return}
+  if(mode!=='map'){await openMap()}
+  if(!SM){SM=L.map(streetEl,{zoomControl:false,attributionControl:true,zoomSnap:0,zoomDelta:.5,minZoom:3,maxZoom:19,worldCopyJump:true,fadeAnimation:true}).setView([lat,lon],zoom);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:20,attribution:'© OpenStreetMap · © CARTO'}).addTo(SM);
+    CAPS.forEach(c=>L.circleMarker([c.la,c.lo],{radius:5,color:'#ff2a3d',weight:1.5,fillColor:'#ff2a3d',fillOpacity:.6}).addTo(SM).bindTooltip(c.n,{permanent:false}));
+    SM.on('zoomend',()=>{if(streetOn&&SM.getZoom()<4.3)closeStreet()})}
+  streetEl.hidden=false;streetOn=true;hideCard();requestAnimationFrame(()=>{streetEl.classList.add('on');SM.invalidateSize();if(bbox)SM.fitBounds(bbox,{maxZoom:17,animate:false});else SM.setView([lat,lon],zoom,{animate:false})});
+  splace.textContent=label||'Vue des rues';splace.hidden=false}
+function closeStreet(){if(!streetOn)return;streetOn=false;const c=SM.getCenter();tv.lat=c.lat;tv.lon=((c.lng+540)%360)-180;view.lat=tv.lat;view.lon=tv.lon;z=.85;zEff=.85;
+  streetEl.classList.remove('on');splace.hidden=true;setTimeout(()=>{if(!streetOn)streetEl.hidden=true},600)}
+async function geocode(q){try{const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=fr&q='+encodeURIComponent(q));const j=await r.json();if(!j.length)return null;const g=j[0],b=g.boundingbox.map(Number);return{lat:+g.lat,lon:+g.lon,bbox:[[b[0],b[2]],[b[1],b[3]]],name:g.display_name.split(',').slice(0,2).join(',')}}catch(e){return null}}
+
 // ───────── toucher
 const ptrs=new Map();let downT=0,pz=null,downAt=null,moved=false,lastTap=0,lpT=null;
 const pos=e=>({x:e.clientX,y:e.clientY});
-app.addEventListener('pointerdown',e=>{if(locked)return;if(e.target.closest('.convo,.modal,.st,.hlbl'))return;try{app.setPointerCapture(e.pointerId)}catch(_){}ptrs.set(e.pointerId,pos(e));lastInput=performance.now();
+app.addEventListener('pointerdown',e=>{if(locked)return;if(e.target.closest('.convo,.modal,.st,.hlbl')||(streetOn&&e.target.closest('#street')))return;try{app.setPointerCapture(e.pointerId)}catch(_){}ptrs.set(e.pointerId,pos(e));lastInput=performance.now();
   if(ptrs.size===1){downAt=pos(e);downT=performance.now();moved=false}else if(ptrs.size===2){const[a,b]=[...ptrs.values()];pz={d:Math.hypot(a.x-b.x,a.y-b.y)};moved=true}});
 app.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const o=ptrs.get(e.pointerId),p=pos(e);ptrs.set(e.pointerId,p);lastInput=performance.now();
   if(mode==='body'){if(ptrs.size===1){if(Math.hypot(p.x-downAt.x,p.y-downAt.y)>8)moved=true;byaw+=(p.x-o.x)/W*6;btilt=Math.max(-1,Math.min(1,btilt+(p.y-o.y)/H*3))}else if(ptrs.size===2&&pz){const[a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y);bz=Math.max(0,Math.min(1,bz+Math.log(d/pz.d)*.7));pz.d=d}return}
@@ -702,7 +733,7 @@ startCam();faceGate();
 
 // ───────── appli fermée : micro et caméra coupés
 let micWasOn=false;
-function sleepAll(){hiddenAt=Date.now();if(STT.state==='rec')sttStop(false);micWasOn=micOn;micOn=false;recPause();setConvo();try{speechSynthesis.cancel()}catch(e){}speaking=false;
+function sleepAll(){hiddenAt=Date.now();if(STT.state==='rec')sttStop(false);if(STT.stream){STT.stream.getTracks().forEach(t=>t.stop());STT.stream=null;clearInterval(STT.timer);try{STT.ctx.close()}catch(e){}STT.ctx=null;STT.state='idle'}try{$('lockvid').srcObject=null}catch(e){}micWasOn=micOn;micOn=false;recPause();setConvo();try{speechSynthesis.cancel()}catch(e){}speaking=false;
   if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null}camOn=false;const v=$('cam');v.srcObject=null;const st=$('camst');st.hidden=false;st.textContent='Caméra en pause'}
 function wakeAll(){startCam();if(Date.now()-hiddenAt>30000){faceGate();return}if(micWasOn||!userMicOff){micOn=true;setConvo();setTimeout(recStart,600)}}
 document.addEventListener('visibilitychange',()=>{document.hidden?sleepAll():wakeAll()});
