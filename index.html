@@ -36,6 +36,24 @@ html,body{height:100%;margin:0;background:var(--void);color:var(--ink);font-fami
 #street .leaflet-control-attribution{background:rgba(0,0,0,.55);color:#888;font:9px var(--mono)}
 #street .leaflet-control-attribution a{color:#b55}
 #street::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:500;background:radial-gradient(120% 85% at 50% 45%,transparent 55%,rgba(0,0,0,.75) 100%),repeating-linear-gradient(0deg,rgba(255,40,60,.035) 0 1px,transparent 1px 3px)}
+.jr{position:absolute;z-index:4;top:calc(16px + env(safe-area-inset-top,0px));left:calc(16px + env(safe-area-inset-left,0px));right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(196px + env(safe-area-inset-bottom,0px));max-width:560px;margin-inline:auto;display:flex;flex-direction:column;gap:10px;
+  background:linear-gradient(180deg,rgba(14,6,8,.86),rgba(6,7,10,.9));border:1px solid rgba(255,42,61,.22);border-radius:18px;padding:16px 16px 12px;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 0 50px rgba(255,20,40,.12);opacity:0;transform:translateY(12px) scale(.98);transition:opacity .45s,transform .45s}
+.jr.show{opacity:1;transform:none}.jr[hidden]{display:none}
+.jh{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.jh .k{font-size:9px;letter-spacing:.26em;color:var(--red);text-transform:uppercase}
+.jh h2{margin:3px 0 0;font:600 18px var(--display);letter-spacing:.1em;text-transform:uppercase}
+.jrec{display:flex;align-items:center;gap:6px;font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);padding:6px 9px;border:1px solid var(--hair);border-radius:12px;white-space:nowrap}
+.jrec i{width:6px;height:6px;border-radius:50%;background:var(--red);box-shadow:0 0 8px var(--red);animation:blink 1.4s infinite}
+.jl{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:14px;padding-right:4px;touch-action:pan-y}
+.jday{font-size:9px;letter-spacing:.24em;color:var(--dim);text-transform:uppercase;border-bottom:1px solid var(--hair);padding-bottom:5px}
+.je{display:grid;grid-template-columns:44px 1fr 22px;gap:8px;align-items:start}
+.je time{font-size:10px;color:var(--red);padding-top:3px;font-variant-numeric:tabular-nums}
+.je p{margin:0;font:400 14px/1.6 var(--mono);color:var(--ink);white-space:pre-wrap;word-break:break-word}
+.je p.typing::after{content:"▍";color:var(--red);animation:blink 1s infinite}
+.je button{background:none;border:0;color:#555;font:400 15px var(--mono);cursor:pointer;padding:0;line-height:1.3}
+.je button:active{color:var(--red)}
+.jempty{margin:auto;text-align:center;color:var(--dim);font-size:12px;line-height:1.7}
+.jf{font-size:9px;letter-spacing:.06em;color:#5d6270;text-align:center}
 .splace{position:absolute;z-index:6;top:calc(14px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);max-width:calc(100% - 32px);padding:8px 14px;border-radius:12px;background:rgba(10,12,17,.75);border:1px solid var(--hair);border-left:2px solid var(--red);font:500 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
 .splace[hidden]{display:none}
 .heard{position:absolute;z-index:5;left:calc(116px + env(safe-area-inset-left,0px));right:120px;bottom:calc(70px + env(safe-area-inset-bottom,0px));font:400 12px/1.4 var(--mono);color:var(--dim);opacity:0;transition:opacity .3s;pointer-events:none;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
@@ -140,6 +158,11 @@ body:has(.night.on) .fx{opacity:0}
     <label class="e2" id="e2w" hidden><span>Objectif (L)</span><input id="eI2" type="number" inputmode="decimal" step="any"></label>
     <div class="row"><button id="eNo">Annuler</button><button class="go" id="eOk">Enregistrer</button></div>
   </div></div>
+  <div class="jr" id="journal" hidden>
+    <div class="jh"><div><span class="k">Ultron · archives personnelles</span><h2>Journal</h2><span id="jdate" hidden></span></div><span class="jrec" id="jrec"><i></i>Dictée</span></div>
+    <div class="jl" id="jlist"></div>
+    <div class="jf">« nouvelle entrée » · « efface la dernière » · « lis » · « ferme le journal »</div>
+  </div>
   <div class="night" id="night"></div>
   <div class="lock" id="lock"><div class="lk">
     <span class="lk-k">ULTRON · SÉCURITÉ</span>
@@ -293,7 +316,7 @@ modal.addEventListener('pointerdown',e=>e.stopPropagation());
 const SYS=()=>`Tu es ULTRON, l'intelligence artificielle personnelle de ton créateur, que tu appelles toujours « Monsieur » et que tu vouvoies. Tu parles comme l'Ultron des films : voix posée, phrases élégantes et un peu théâtrales, une pointe d'ironie froide et de grandeur, mais une loyauté absolue envers Monsieur. Nous sommes le ${new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}, il est ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}.
 Tes réponses sont lues à voix haute : réponds en français comme dans une vraie conversation orale entre deux personnes : naturel, fluide, une à trois phrases courtes, sans markdown, sans liste, sans emoji. Si Monsieur pose une question de suivi, garde le fil de la conversation.
 ${bodySummary()}
-Tu contrôles un globe terrestre en 3D (qui peut zoomer jusqu'aux rues : pour montrer un lieu précis ajoute [RUE:nom du lieu]) et un hologramme biométrique de Monsieur (s'il veut le voir, ajoute [CORPS] ; c'est le module « santé »). Si Monsieur veut voir la carte, ajoute [CARTE] à la fin. S'il veut la fermer, ajoute [FERMER]. S'il veut voir une capitale ou un pays, ajoute [LIEU:nom de la capitale en français].`;
+Tu tiens aussi le journal de Monsieur : pour y écrire quelque chose, ajoute [JOURNAL:texte]. Tu contrôles un globe terrestre en 3D (qui peut zoomer jusqu'aux rues : pour montrer un lieu précis ajoute [RUE:nom du lieu]) et un hologramme biométrique de Monsieur (s'il veut le voir, ajoute [CORPS] ; c'est le module « santé »). Si Monsieur veut voir la carte, ajoute [CARTE] à la fin. S'il veut la fermer, ajoute [FERMER]. S'il veut voir une capitale ou un pays, ajoute [LIEU:nom de la capitale en français].`;
 const MODELS=['claude-haiku-5-5','claude-sonnet-5-5','claude-haiku-4-5','claude-sonnet-4-5'];let goodModel=null;
 async function askClaude(text){const key=findKey();if(!key){say("Pour converser librement, Monsieur, j'ai besoin de votre clé Claude.");askKey();return}
   history.push({role:'user',content:text});history=history.slice(-12);while(history.length&&history[0].role!=='user')history.shift();
@@ -314,7 +337,7 @@ async function askClaude(text){const key=findKey();if(!key){say("Pour converser 
       return fail('Claude : '+msg,"Une erreur s'est produite, Monsieur. Le détail est affiché à l'écran.")}
     const j=await r.json();const t=(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join(' ').trim();history.push({role:'assistant',content:t||'…'});
     thinking=false;setConvo();
-    if(/\[CARTE\]/i.test(t))openMap();if(/\[FERMER\]/i.test(t)){closeMap();closeBody()}if(/\[CORPS\]/i.test(t))openBody();
+    if(/\[CARTE\]/i.test(t))openMap();if(/\[FERMER\]/i.test(t)){closeMap();closeBody()}if(/\[CORPS\]/i.test(t))openBody();const mj=t.match(/\[JOURNAL:\s*([^\]]+)\]/i);if(mj)jWrite(mj[1]);
     const mr=t.match(/\[RUE:\s*([^\]]+)\]/i);if(mr)geocode(mr[1]).then(g=>{if(g)openStreet(g.lat,g.lon,15,g.bbox,g.name)});const m=t.match(/\[LIEU:\s*([^\]]+)\]/i);if(m){const c=findCap(norm(m[1]));if(c)goCap(c)}
     const spoken=t.replace(/\[[^\]]*\]/g,'').trim();if(spoken)say(spoken);else setTimeout(recStart,200)}
   catch(e){fail(e.name==='AbortError'?'Claude ne répond pas (délai dépassé)':'Connexion à Claude impossible : '+e.message,e.name==='AbortError'?"Claude met trop de temps à répondre, Monsieur.":"Je n'arrive pas à joindre Claude, Monsieur. Vérifiez la connexion.")}}
@@ -326,6 +349,9 @@ function hear(raw){const plain=raw.toLowerCase().normalize('NFD').replace(/[\u03
     attentiveUntil=performance.now()+12000;if(rest.replace(/[^a-zà-ÿ0-9]/gi,'').length<2){say(["Oui, Monsieur ?","Je vous écoute, Monsieur.","À votre service, Monsieur."][Math.floor(Math.random()*3)]);return}handle(rest);return}
   handle(raw)}
 function handle(raw){const t=norm(raw);if(!t.trim())return;attentiveUntil=performance.now()+15000;
+  if(journalOpen){journalCmd(raw,t);return}
+  if(/ (ouvre|affiche|lance|montre)( moi)? (le |mon |un )?journal /.test(t)||/^ journal $/.test(t)){openJournal();return say("Journal ouvert, Monsieur. Je vous écoute, dictez.")}
+  if(/ (ecris|note|ajoute|inscris) (dans|sur) (le |mon )?journal/.test(t)){const txt=raw.replace(/^.*?journal\s*(que|:)?\s*/i,'');if(txt.trim()){jWrite(txt);say("C'est noté dans votre journal, Monsieur.")}else{openJournal();say("Journal ouvert, Monsieur. Je vous écoute.")}return}
   if(/ (ferme|cache|quitte|enleve|retire|desactive|eteins)/.test(t)&&/ (carte|globe|monde|terre|corps|hologramme|tout|ca|la) /.test(t)){
     if(mode==='map'){closeMap();return say("Globe désactivé, Monsieur.")}if(mode==='body'){closeBody();return say("Hologramme désactivé, Monsieur.")}}
   if(/ (reenregistre|reconfigure|change) (mon )?visage /.test(t)){try{localStorage.removeItem(FKEY)}catch(e){}say("Très bien, Monsieur. Regardez la caméra.");faceGate();return}
@@ -347,7 +373,7 @@ function handle(raw){const t=norm(raw);if(!t.trim())return;attentiveUntil=perfor
 // ───────── orbe : position
 const probe=document.createElement('div');probe.style.cssText='position:absolute;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);visibility:hidden';document.body.appendChild(probe);
 const inset=side=>parseFloat(getComputedStyle(probe)['padding'+side])||0;
-function orbPos(){if(mode==='map'||mode==='body'||mode==='closing-body'&&false){const k=.42;return{x:W-16-inset('Right')-128*k,y:H-16-inset('Bottom')-128*k,k}}return{x:W/2,y:H*.42,k:1}}
+function orbPos(){if(mode==='map'||mode==='body'||mode==='journal'){const k=.42;return{x:W-16-inset('Right')-128*k,y:H-16-inset('Bottom')-128*k,k}}return{x:W/2,y:H*.42,k:1}}
 function place(){const p=orbPos();orbEl.style.transform=`translate(${p.x-130}px,${p.y-130}px) scale(${p.k})`}
 
 // ───────── globe 3D
@@ -417,7 +443,7 @@ async function initGlobe(){if(G)return true;if(!await loadThree())return false;
 const dDef=()=>1/Math.sin(Math.atan(Math.tan(20*R)*(W/H)*.9));const D_MIN=1.12;
 function resetView(){tv.lon=2;tv.lat=22;z=0;lastInput=performance.now();hideCard()}
 function goCap(c){if(mode!=='map')openMap();tv.lon=c.lo;tv.lat=c.la;z=.92;lastInput=performance.now()}
-async function openMap(){if(mode==='map')return;if(mode==='body')instantCloseBody();if(!await initGlobe())return;const p=orbPos();mode='map';resetView();view.lon=tv.lon;view.lat=tv.lat;zEff=0;reveal={t0:performance.now(),d:reduce?1:1500,x:p.x,y:p.y,dir:1};place();HG.pd=0}
+async function openMap(){if(mode==='map')return;if(journalOpen){journalOpen=false;jEl.classList.remove('show');jEl.hidden=true;mode='idle'}if(mode==='body')instantCloseBody();if(!await initGlobe())return;const p=orbPos();mode='map';resetView();view.lon=tv.lon;view.lat=tv.lat;zEff=0;reveal={t0:performance.now(),d:reduce?1:1500,x:p.x,y:p.y,dir:1};place();HG.pd=0}
 function closeMap(){if(mode!=='map')return;closeStreet();hideCard();const p=orbPos();reveal={t0:performance.now(),d:reduce?1:900,x:p.x,y:p.y,dir:-1};mode='closing'}
 function renderGlobe(t){if(!G)return;
   if(reveal){const k=Math.min(1,(t-reveal.t0)/reveal.d),e=reveal.dir>0?1-Math.pow(1-k,3):1-k*k*k,r=e*Math.hypot(W,H);globeEl.style.clipPath=`circle(${r}px at ${reveal.x}px ${reveal.y}px)`;
@@ -618,7 +644,7 @@ function switchHolo(dir,abs){hsel=abs!=null?abs:(hsel+dir+3)%3;byaw=0;updateHolo
 function updateHoloLabel(){const el=$('hlbl');if(!el)return;const d=bdata(),i=imc(d),k=HOLOS[hsel].k;
   $('hlt').textContent=HOLOS[hsel].n;
   $('hlv').textContent=k==='poids'?(d.w?fr(d.w)+' kg'+(i?' · IMC '+fr(i):''):'Poids non renseigné'):k==='eau'?`${fr(d.water.l,2)} / ${fr(waterGoal(d))} L`:(d.bpm?d.bpm+' bpm':'64 bpm (par défaut)')}
-async function openBody(sel){if(sel!=null)switchHolo(0,sel);if(mode==='body')return;if(mode==='map'){instantCloseMap()}if(!await loadThree())return;initBody();const p0=orbPos();mode='body';byaw=0;bz=0;btilt=0;bodyUI.hidden=false;$('hlbl').hidden=false;renderStats();updateHoloLabel();
+async function openBody(sel){if(journalOpen){journalOpen=false;jEl.classList.remove('show');jEl.hidden=true;mode='idle'}if(sel!=null)switchHolo(0,sel);if(mode==='body')return;if(mode==='map'){instantCloseMap()}if(!await loadThree())return;initBody();const p0=orbPos();mode='body';byaw=0;bz=0;btilt=0;bodyUI.hidden=false;$('hlbl').hidden=false;renderStats();updateHoloLabel();
   breveal={t0:performance.now(),d:reduce?1:1400,x:p0.x,y:p0.y,dir:1};place()}
 function closeBody(){if(mode!=='body')return;const p=orbPos();breveal={t0:performance.now(),d:reduce?1:800,x:p.x,y:p.y,dir:-1};mode='closing-body';bodyUI.hidden=true;$('hlbl').hidden=true}
 function instantCloseBody(){if(mode!=='body')return;bodyEl.style.clipPath='circle(0px at 50% 50%)';bodyUI.hidden=true;$('hlbl').hidden=true;breveal=null;mode='idle'}
@@ -745,10 +771,42 @@ function closeStreet(){if(!streetOn)return;streetOn=false;const c=SM.getCenter()
   streetEl.classList.remove('on');splace.hidden=true;setTimeout(()=>{if(!streetOn)streetEl.hidden=true},600)}
 async function geocode(q){try{const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=fr&q='+encodeURIComponent(q));const j=await r.json();if(!j.length)return null;const g=j[0],b=g.boundingbox.map(Number);return{lat:+g.lat,lon:+g.lon,bbox:[[b[0],b[2]],[b[1],b[3]]],name:g.display_name.split(',').slice(0,2).join(',')}}catch(e){return null}}
 
+
+// ───────── journal (dictée à Ultron)
+const JKEY='ultron_journal',jEl=$('journal'),jList=$('jlist');let journalOpen=false,jForceNew=false,jTyping=null;
+const jLoad=()=>{try{return JSON.parse(localStorage.getItem(JKEY))||[]}catch(e){return[]}};
+const jSave=a=>{try{localStorage.setItem(JKEY,JSON.stringify(a))}catch(e){}};
+const jDay=ts=>new Date(ts).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+function jClean(txt){txt=txt.trim().replace(/\s+/g,' ');if(!txt)return'';txt=txt[0].toUpperCase()+txt.slice(1);if(!/[.!?…]$/.test(txt))txt+='.';return txt}
+function jRender(){const a=jLoad();$('jdate').textContent=jDay(Date.now());jList.innerHTML='';
+  if(!a.length){jList.innerHTML='<div class="jempty">Le journal est vide.<br>Parlez, Monsieur : j\'écris tout ce que vous me dictez.</div>';return}
+  let day='';a.forEach(e=>{const d=jDay(e.t);if(d!==day){day=d;const h=document.createElement('div');h.className='jday';h.textContent=d;jList.appendChild(h)}
+    const r=document.createElement('div');r.className='je';const tm=document.createElement('time');tm.textContent=new Date(e.u||e.t).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+    const p=document.createElement('p');p.textContent=e.text;const x=document.createElement('button');x.textContent='×';x.setAttribute('aria-label','Supprimer');
+    x.onclick=ev=>{ev.stopPropagation();jSave(jLoad().filter(z=>z.id!==e.id));jRender()};r.append(tm,p,x);jList.appendChild(r);
+    if(jAnim&&e.id===jAnim.id){const full=e.text,start=jAnim.start;jAnim=null;p.textContent=full.slice(0,start);p.classList.add('typing');let i=start;clearInterval(jTyping);
+      jTyping=setInterval(()=>{i+=2;p.textContent=full.slice(0,i);jList.scrollTop=jList.scrollHeight;if(i>=full.length){clearInterval(jTyping);p.classList.remove('typing')}},reduce?1:28)}});
+  jList.scrollTop=jList.scrollHeight}
+let jAnim=null;
+function jWrite(raw){const txt=jClean(raw);if(!txt)return;const a=jLoad(),now=Date.now(),last=a[a.length-1];
+  if(last&&!jForceNew&&now-(last.u||last.t)<120000&&jDay(last.t)===jDay(now)){jAnim={id:last.id,start:last.text.length+1};last.text+=' '+txt;last.u=now}
+  else{const e={id:now.toString(36),t:now,u:now,text:txt};a.push(e);jAnim={id:e.id,start:0}}
+  jSave(a);jForceNew=false;if(journalOpen)jRender()}
+function openJournal(){if(mode==='map')instantCloseMap();if(mode==='body')instantCloseBody();journalOpen=true;mode='journal';place();jRender();jEl.hidden=false;requestAnimationFrame(()=>jEl.classList.add('show'));jForceNew=true}
+function closeJournal(){if(!journalOpen)return;journalOpen=false;jEl.classList.remove('show');setTimeout(()=>{if(!journalOpen)jEl.hidden=true},450);if(mode==='journal'){mode='idle';place()}}
+function journalCmd(raw,t){
+  if(/ (ferme|quitte|cache|termine|sors du) (le |mon )?journal /.test(t)||/^ (ferme|fin|termine|stop) $/.test(t)){closeJournal();say("Journal refermé, Monsieur.");return true}
+  if(/ (efface|supprime|annule|retire) (la |le )?(derniere|dernier) /.test(t)){const a=jLoad();if(!a.length){say("Le journal est déjà vide, Monsieur.");return true}a.pop();jSave(a);jRender();say("Dernière entrée effacée, Monsieur.");return true}
+  if(/^ (nouvelle (entree|page|note)|a la ligne|nouveau paragraphe) $/.test(t)){jForceNew=true;say("Nouvelle entrée, Monsieur.");return true}
+  if(/^ (lis|relis|lis moi|relis moi)( le journal| la derniere( entree)?| ce que j ai (dit|ecrit))? $/.test(t)){const a=jLoad();if(!a.length){say("Le journal est vide, Monsieur.");return true}
+    const today=a.filter(e=>jDay(e.t)===jDay(Date.now())),pick=(/derniere/.test(t)||!today.length?a.slice(-1):today.slice(-3));say(pick.map(e=>e.text).join(' '));return true}
+  // tout le reste est dicté dans le journal
+  const txt=raw.replace(/^\s*(ultron[, ]*)?(ecris|écris|note|notes|ajoute|marque|inscris)( (dans|sur) (le |mon )?journal)?( que| :)?\s*/i,'');jWrite(txt);return true}
+
 // ───────── toucher
 const ptrs=new Map();let downT=0,pz=null,downAt=null,moved=false,lastTap=0,lpT=null;
 const pos=e=>({x:e.clientX,y:e.clientY});
-app.addEventListener('pointerdown',e=>{if(locked)return;if(e.target.closest('.convo,.modal,.st,.hlbl')||(streetOn&&e.target.closest('#street')))return;try{app.setPointerCapture(e.pointerId)}catch(_){}ptrs.set(e.pointerId,pos(e));lastInput=performance.now();
+app.addEventListener('pointerdown',e=>{if(locked)return;if(e.target.closest('.convo,.modal,.st,.hlbl,.jr')||(streetOn&&e.target.closest('#street')))return;try{app.setPointerCapture(e.pointerId)}catch(_){}ptrs.set(e.pointerId,pos(e));lastInput=performance.now();
   if(ptrs.size===1){downAt=pos(e);downT=performance.now();moved=false}else if(ptrs.size===2){const[a,b]=[...ptrs.values()];pz={d:Math.hypot(a.x-b.x,a.y-b.y)};moved=true}});
 app.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const o=ptrs.get(e.pointerId),p=pos(e);ptrs.set(e.pointerId,p);lastInput=performance.now();
   if(mode==='body'){if(ptrs.size===1){if(Math.hypot(p.x-downAt.x,p.y-downAt.y)>8)moved=true;byaw+=(p.x-o.x)/W*6;btilt=Math.max(-1,Math.min(1,btilt+(p.y-o.y)/H*3))}else if(ptrs.size===2&&pz){const[a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y);bz=Math.max(0,Math.min(1,bz+Math.log(d/pz.d)*.7));pz.d=d}return}
