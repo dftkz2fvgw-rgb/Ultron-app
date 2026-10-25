@@ -97,7 +97,7 @@ body:has(.night.on) .fx{opacity:0}
 .lk-k{font-size:10px;letter-spacing:.3em;color:var(--red)}
 .lock.flash .lk-k{color:#b0101f}.lock.flash p{color:#1a1a1a}
 .lk-ring{position:relative;width:220px;height:220px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,42,61,.6);box-shadow:0 0 40px rgba(255,42,61,.35)}
-.lk-ring video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.lk-ring canvas{display:block;width:100%;height:100%;transform:scaleX(-1)}
 .lk-ring i{position:absolute;left:0;right:0;height:2px;background:var(--red);box-shadow:0 0 12px var(--red);top:0;animation:scanl 2s ease-in-out infinite}
 @keyframes scanl{50%{top:calc(100% - 2px)}}
 .lock[data-state=ok] .lk-ring{border-color:#3fd68f;box-shadow:0 0 40px rgba(63,214,143,.5)}.lock[data-state=ok] .lk-ring i{display:none}
@@ -143,7 +143,7 @@ body:has(.night.on) .fx{opacity:0}
   <div class="night" id="night"></div>
   <div class="lock" id="lock"><div class="lk">
     <span class="lk-k">ULTRON · SÉCURITÉ</span>
-    <div class="lk-ring"><video id="lockvid" playsinline muted autoplay></video><i></i></div>
+    <div class="lk-ring"><canvas id="lockcv"></canvas><i></i></div>
     <p id="lockst">Activation…</p><button id="lockbtn" hidden>Réessayer</button>
   </div></div>
   <div class="card" id="card"><img id="cimg" alt="" hidden><div class="b"><span class="k" id="ck"></span><h2 id="cn"></h2><p id="cd"></p></div></div>
@@ -486,7 +486,7 @@ function onHands(l){const now=performance.now();
 let camOn=false,camStream=null,handsInit=false;
 async function startCam(){if(camOn)return;const v=$('cam'),st=$('camst');st.hidden=false;st.textContent='Caméra…';
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){st.textContent='Ouvre dans Safari';return}
-  try{const s2=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:false});camStream=s2;v.srcObject=s2;v.muted=true;v.setAttribute('playsinline','');await v.play().catch(()=>{});camOn=true;st.hidden=true}
+  try{const s2=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480},aspectRatio:{ideal:4/3}},audio:false});camStream=s2;v.srcObject=s2;v.muted=true;v.setAttribute('playsinline','');await v.play().catch(()=>{});camOn=true;st.hidden=true}
   catch(e){st.textContent=/NotAllowed|Permission/i.test(e.name+e.message)?'Touche pour autoriser':'Caméra indisponible';return}
   if(handsInit)return;handsInit=true;
   try{const V=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');const fs=await V.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
@@ -658,7 +658,7 @@ function enhancedFrame(v){const w=320,h=Math.round(320*(v.videoHeight||480)/(v.v
   return PC}
 
 // ───────── verrouillage par reconnaissance du visage
-const lockEl=$('lock'),lockSt=$('lockst'),lockVid=$('lockvid'),lockBtn=$('lockbtn');let locked=true,faceApi=null,gateRunning=false,hiddenAt=0;
+const lockEl=$('lock'),lockSt=$('lockst'),lockCv=$('lockcv'),lockBtn=$('lockbtn');let locked=true,faceApi=null,gateRunning=false,hiddenAt=0;
 const FAPI='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.esm.js',FMOD='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/';
 const FKEY='ultron_face_v2';let useSSD=true;
 const lockSay=(t,cls)=>{lockSt.textContent=t;lockEl.dataset.state=cls||''};
@@ -674,10 +674,21 @@ function faceFrame(v){const w=480,h=Math.round(480*(v.videoHeight||480)/(v.video
 async function readFace(minScore=.6){const v=$('cam');if(v.readyState<2)return null;enhancedFrame(v);const f=faceFrame(v);
   const opt=useSSD?new faceApi.SsdMobilenetv1Options({minConfidence:.45}):new faceApi.TinyFaceDetectorOptions({inputSize:416,scoreThreshold:.4});
   const r=await faceApi.detectSingleFace(f,opt).withFaceLandmarks().withFaceDescriptor();if(!r)return null;
-  const box=r.detection.box,sc=r.detection.score;if(sc<minScore||box.width<f.width*.16)return{tooSmall:box.width<f.width*.16,lowScore:sc<minScore};
+  const box=r.detection.box,sc=r.detection.score;faceTarget(box,f);if(sc<minScore||box.width<f.width*.16)return{tooSmall:box.width<f.width*.16,lowScore:sc<minScore};
   // orientation approximative de la tête (gauche/droite) à partir du nez et des yeux
   const lm=r.landmarks.positions,nose=lm[30],le=lm[36],re=lm[45],yaw=((nose.x-le.x)/(re.x-le.x)-.5);
   return{d:Array.from(r.descriptor),yaw,score:sc}}
+const LX=lockCv.getContext('2d');let crop=null,cropT=null;
+function faceTarget(box,f){const v=$('cam'),k=(v.videoWidth||640)/f.width;const cx=(box.x+box.width/2)*k,cy=(box.y+box.height/2)*k,size=box.width*k*2.3;cropT={x:cx,y:cy-box.height*k*.05,s:size}}
+let lockLoop=false;function drawLock(){if(lockLoop)return;lockLoop=true;drawLockF()}
+function drawLockF(){if(lockEl.hidden){lockLoop=false;return}const v=$('cam'),dpr=Math.min(2,devicePixelRatio||1),S=Math.round(lockCv.clientWidth*dpr)||440;if(lockCv.width!==S){lockCv.width=S;lockCv.height=S}
+  if(v.readyState>=2&&v.videoWidth){const vw=v.videoWidth,vh=v.videoHeight,full=Math.min(vw,vh);
+    // sans visage détecté : carré central fixe ; avec visage : recadrage doux autour du visage
+    const tgt=cropT||{x:vw/2,y:vh/2,s:full*.8};tgt.s=Math.max(full*.45,Math.min(full,tgt.s));
+    if(!crop)crop={...tgt};const a=.12;crop.x+=(tgt.x-crop.x)*a;crop.y+=(tgt.y-crop.y)*a;crop.s+=(tgt.s-crop.s)*a*.6;
+    const half=crop.s/2,sx=Math.max(0,Math.min(vw-crop.s,crop.x-half)),sy=Math.max(0,Math.min(vh-crop.s,crop.y-half));
+    LX.drawImage(v,sx,sy,crop.s,crop.s,0,0,S,S)}
+  requestAnimationFrame(drawLockF)}
 function match(saved,d){const ds=saved.samples.map(s=>dist(s,d)).sort((a,b)=>a-b),best=ds[0],m3=(ds[0]+(ds[1]??ds[0])+(ds[2]??ds[0]))/3;return{best,m3}}
 const STEPS=[['Regardez droit vers l\'écran, Monsieur.',v=>Math.abs(v)<.12],['Tournez légèrement la tête vers la gauche.',v=>v>.08],['Maintenant légèrement vers la droite.',v=>v<-.08],['Revenez face à l\'écran et approchez un peu.',v=>Math.abs(v)<.15]];
 async function enroll(){const samples=[];say("Enregistrement de votre visage, Monsieur. Suivez mes instructions.");await wait(1500);
@@ -687,10 +698,10 @@ async function enroll(){const samples=[];say("Enregistrement de votre visage, Mo
       else if(r&&r.tooSmall)lockSay('Approchez votre visage de l\'écran.','scan');await wait(180)}}
   if(samples.length<8){lockSay('Enregistrement incomplet. Placez-vous dans la lumière et réessayez.','deny');lockBtn.hidden=false;return false}
   saveFace({samples,base:samples.length,date:Date.now()});return true}
-async function faceGate(){if(gateRunning)return;gateRunning=true;locked=true;lockEl.hidden=false;lockEl.classList.remove('gone');lockBtn.hidden=true;hideCard();
+async function faceGate(){if(gateRunning)return;gateRunning=true;crop=null;cropT=null;locked=true;lockEl.hidden=false;lockEl.classList.remove('gone');lockBtn.hidden=true;hideCard();
   try{lockSay('Activation de la caméra…','scan');for(let i=0;i<100&&!camStream;i++)await wait(150);
     if(!camStream){lockSay('Caméra indisponible. Autorisez-la dans les réglages de Safari.','deny');lockBtn.hidden=false;return}
-    lockVid.srcObject=camStream;lockVid.play().catch(()=>{});
+    drawLock();
     if(!faceApi){lockSay('Chargement de la reconnaissance faciale…','scan');faceApi=await import(FAPI);
       try{await faceApi.nets.ssdMobilenetv1.loadFromUri(FMOD)}catch(e){useSSD=false;await faceApi.nets.tinyFaceDetector.loadFromUri(FMOD)}
       await faceApi.nets.faceLandmark68Net.loadFromUri(FMOD);await faceApi.nets.faceRecognitionNet.loadFromUri(FMOD)}
@@ -759,7 +770,7 @@ startCam();faceGate();
 
 // ───────── appli fermée : micro et caméra coupés
 let micWasOn=false;
-function sleepAll(){hiddenAt=Date.now();if(STT.state==='rec')sttStop(false);if(STT.stream){STT.stream.getTracks().forEach(t=>t.stop());STT.stream=null;clearInterval(STT.timer);try{STT.ctx.close()}catch(e){}STT.ctx=null;STT.state='idle'}try{$('lockvid').srcObject=null}catch(e){}micWasOn=micOn;micOn=false;recPause();setConvo();try{speechSynthesis.cancel()}catch(e){}speaking=false;
+function sleepAll(){hiddenAt=Date.now();if(STT.state==='rec')sttStop(false);if(STT.stream){STT.stream.getTracks().forEach(t=>t.stop());STT.stream=null;clearInterval(STT.timer);try{STT.ctx.close()}catch(e){}STT.ctx=null;STT.state='idle'}micWasOn=micOn;micOn=false;recPause();setConvo();try{speechSynthesis.cancel()}catch(e){}speaking=false;
   if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null}camOn=false;const v=$('cam');v.srcObject=null;const st=$('camst');st.hidden=false;st.textContent='Caméra en pause'}
 function wakeAll(){startCam();if(Date.now()-hiddenAt>30000){faceGate();return}if(micWasOn||!userMicOff){micOn=true;setConvo();setTimeout(recStart,600)}}
 document.addEventListener('visibilitychange',()=>{document.hidden?sleepAll():wakeAll()});
