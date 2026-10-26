@@ -225,8 +225,8 @@ body:has(.night.on) .fx{opacity:0}
     <h3>CLÉS D'ULTRON</h3>
     <p><b>Écoute</b> : clé Groq gratuite (console.groq.com → API Keys, elle commence par gsk_). Une clé OpenAI marche aussi.</p>
     <input id="sttin" type="password" placeholder="gsk_…" autocomplete="off">
-    <p><b>Scanner</b> : clé Google Gemini gratuite (aistudio.google.com → Get API key, elle commence par AIza).</p>
-    <input id="gemin" type="password" placeholder="AIza…" autocomplete="off">
+    <p><b>Scanner</b> : clé Google Gemini gratuite (aistudio.google.com → Get API key, elle commence par AIza ou AQ.).</p>
+    <input id="gemin" type="password" placeholder="AIza… ou AQ.…" autocomplete="off">
     <p><b>Conversation</b> : clé Claude (commence par sk-ant-).</p>
     <input id="keyin" type="password" placeholder="sk-ant-…" autocomplete="off">
     <p>Elles restent uniquement sur ce téléphone.</p>
@@ -359,11 +359,11 @@ function micToggle(){if(!SR&&!sttKey()){askKey();return}if(false){say("La reconn
 function findKey(){try{const k=localStorage.getItem('ultron_key');if(k)return k.trim();if(localStorage.getItem('ultron_key_bad'))return null;for(let i=0;i<localStorage.length;i++){const v=localStorage.getItem(localStorage.key(i))||'';const m=v.match(/sk-ant-[A-Za-z0-9_\-]{20,}/);if(m)return m[0]}}catch(e){}return null}
 const modal=$('modal'),keyin=$('keyin'),sttin=$('sttin');
 function gemKey(){try{return localStorage.getItem('ultron_gemini')}catch(e){return null}}
-function askKey(){modal.hidden=false;keyin.value='';sttin.value='';$('gemin').value='';$('gemin').placeholder=gemKey()?'••••  enregistrée':'AIza…';sttin.placeholder=sttKey()?'••••  enregistrée':'gsk_…';keyin.placeholder=findKey()?'••••  enregistrée':'sk-ant-…';setTimeout(()=>(sttKey()?keyin:sttin).focus(),50)}
+function askKey(){modal.hidden=false;keyin.value='';sttin.value='';$('gemin').value='';$('gemin').placeholder=gemKey()?'••••  enregistrée':'AIza… ou AQ.…';sttin.placeholder=sttKey()?'••••  enregistrée':'gsk_…';keyin.placeholder=findKey()?'••••  enregistrée':'sk-ant-…';setTimeout(()=>(sttKey()?keyin:sttin).focus(),50)}
 $('hlp').onclick=e=>{e.stopPropagation();switchHolo(-1)};$('hln').onclick=e=>{e.stopPropagation();switchHolo(1)};
 $('kno').onclick=()=>{modal.hidden=true};
 $('kok').onclick=()=>{try{localStorage.removeItem('ultron_key_bad')}catch(e){}goodModel=null;const v=keyin.value.trim(),w=sttin.value.trim(),gm=$('gemin').value.trim();let bad=false;
-  if(gm){if(/^AIza[\w-]{20,}$/.test(gm)){try{localStorage.setItem('ultron_gemini',gm)}catch(e){}gemModel=null}else{$('gemin').style.borderColor='var(--red)';bad=true}}
+  if(gm){if(/^\S{20,}$/.test(gm)&&!/^(sk-|gsk_)/.test(gm)){try{localStorage.setItem('ultron_gemini',gm)}catch(e){}gemModel=null}else{$('gemin').style.borderColor='var(--red)';bad=true}}
   if(w){if(/^(gsk_|sk-)/.test(w)&&!/^sk-ant-/.test(w)){try{localStorage.setItem('ultron_stt',w)}catch(e){}}else{sttin.style.borderColor='var(--red)';bad=true}}
   if(v){if(/^sk-ant-/.test(v)){try{localStorage.setItem('ultron_key',v)}catch(e){}}else{keyin.style.borderColor='var(--red)';bad=true}}
   if(bad)return;modal.hidden=true;micOn=true;needTap=false;setConvo();recStart();say("Clés enregistrées. Je vous écoute, Monsieur.")};
@@ -998,12 +998,12 @@ async function wikiFr(term){try{const r=await fetch('https://en.wikipedia.org/w/
 let gemModel=null,groqVis=null;
 const parseJSON=txt=>{const a=txt.indexOf('{'),b=txt.lastIndexOf('}');if(a<0||b<a)throw new Error('réponse illisible');return JSON.parse(txt.slice(a,b+1))};
 async function scanGemini(){const key=gemKey();if(!key)throw new Error('pas de clé Gemini');const data=frz.toDataURL('image/jpeg',.85).split(',')[1];
-  if(!gemModel){const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key='+key);if(r.status===400||r.status===403){try{localStorage.removeItem('ultron_gemini')}catch(e){}throw new Error('clé Gemini refusée')}
+  if(!gemModel){const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200',{headers:{'x-goog-api-key':key}});if(r.status===400||r.status===403){try{localStorage.removeItem('ultron_gemini')}catch(e){}throw new Error('clé Gemini refusée')}
     const j=await r.json(),ms=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes('generateContent')&&/gemini/.test(m.name)&&/flash/.test(m.name)&&!/(image|tts|audio|live|thinking-exp|embedding)/.test(m.name));
     const v=n=>{const m=n.match(/gemini-(\d+(?:\.\d+)?)/);return m?parseFloat(m[1]):0};ms.sort((a,b)=>v(b.name)-v(a.name)||(/lite/.test(a.name)-/lite/.test(b.name))||(/preview|exp/.test(a.name)-/preview|exp/.test(b.name)));
     gemModel=(ms[0]&&ms[0].name)||'models/gemini-2.5-flash'}
   const call=async withSearch=>{const body={contents:[{parts:[{inline_data:{mime_type:'image/jpeg',data}},{text:SCAN_PROMPT}]}],generationConfig:{temperature:.2}};if(withSearch)body.tools=[{google_search:{}}];
-    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/${gemModel}:generateContent?key=${key}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/${gemModel}:generateContent`,{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':key},body:JSON.stringify(body)});
     if(!r.ok){const e=await r.json().catch(()=>({}));throw Object.assign(new Error((e.error&&e.error.message)||('erreur '+r.status)),{status:r.status})}
     const j=await r.json();return parseJSON(((j.candidates||[])[0]?.content?.parts||[]).map(p=>p.text||'').join(''))};
   try{return await call(true)}catch(e){if(e.status===429)throw new Error('quota Gemini atteint pour aujourd\'hui');return await call(false)}}
