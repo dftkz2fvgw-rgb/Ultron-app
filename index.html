@@ -88,6 +88,13 @@ html,body{height:100%;margin:0;background:var(--void);color:var(--ink);font-fami
 .simg{width:64px;height:64px;object-fit:contain;border-radius:10px;background:#fff;float:right;margin:0 0 6px 10px}
 .sact{display:flex;gap:8px;flex-wrap:wrap}.sact button{flex:1;font:600 11px var(--mono);letter-spacing:.1em;padding:10px;border-radius:10px;border:1px solid rgba(255,42,61,.45);background:none;color:var(--red);cursor:pointer}
 #app.scanning #cam,#app.scanning .camst{display:none}
+.standby{position:absolute;inset:0;z-index:15;background:#000;display:grid;place-items:center;transition:opacity 1.2s;opacity:0}.standby.on{opacity:1}.standby[hidden]{display:none}
+.standby canvas{width:180px;height:180px}
+.standby span{position:absolute;bottom:calc(60px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;font-size:9px;letter-spacing:.32em;color:#3a1015;text-transform:uppercase}
+#app.ignite .orb canvas{animation:ignite 1.6s cubic-bezier(.2,.8,.2,1)}
+@keyframes ignite{0%{filter:brightness(.2) saturate(.5);transform:scale(.6)}25%{filter:brightness(2.6) saturate(1.4);transform:scale(1.18)}100%{filter:none;transform:scale(1)}}
+.flash{position:absolute;inset:0;z-index:14;pointer-events:none;background:radial-gradient(circle at var(--fx,50%) var(--fy,42%),rgba(255,40,60,.55),rgba(255,0,30,.12) 35%,transparent 65%);animation:flash 1.4s ease-out forwards}
+@keyframes flash{0%{opacity:0}12%{opacity:1}100%{opacity:0}}
 .splace{position:absolute;z-index:6;top:calc(14px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);max-width:calc(100% - 32px);padding:8px 14px;border-radius:12px;background:rgba(10,12,17,.75);border:1px solid var(--hair);border-left:2px solid var(--red);font:500 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
 .splace[hidden]{display:none}
 .heard{position:absolute;z-index:5;left:calc(116px + env(safe-area-inset-left,0px));right:120px;bottom:calc(70px + env(safe-area-inset-bottom,0px));font:400 12px/1.4 var(--mono);color:var(--dim);opacity:0;transition:opacity .3s;pointer-events:none;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
@@ -214,6 +221,7 @@ body:has(.night.on) .fx{opacity:0}
       <div class="sact"><button id="sagain">Nouveau scan</button><button id="socr">Lire le texte</button><button id="sjr">Noter au journal</button><a id="sprice" target="_blank" rel="noopener" hidden>Voir les prix ›</a></div>
     </div>
   </div>
+  <div class="standby" id="standby" hidden><canvas id="ember"></canvas><span id="sbtxt">Dites « Ultron »</span></div>
   <div class="night" id="night"></div>
   <div class="lock" id="lock"><div class="lk">
     <span class="lk-k">ULTRON · SÉCURITÉ</span>
@@ -399,9 +407,11 @@ async function askClaude(text){const key=findKey();if(!key){say("Pour converser 
 const findCap=t=>CAPS.find(c=>t.includes(norm(c.n))||t.includes(norm(c.c)));
 const WAKE=/\b(ultron|ultrons|ultra|ultrone|hultron|ul tron|eltron|altron|oultron|ultrom)\b/i;let attentiveUntil=0;
 const attentive=()=>performance.now()<attentiveUntil;
-function hear(raw){const plain=raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+function hear(raw){const plain=raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');act();
+  if(standby){if(WAKE.test(plain)){const rest=raw.replace(/\b(hey|eh|ok|dis|salut|bonjour)?\s*(ultron|ultrons|ultra|ultrone|hultron|ul tron|eltron|altron|oultron|ultrom)\b[\s,.!?]*/i,' ').trim();wakeUp(rest.replace(/[^a-zà-ÿ0-9]/gi,'').length>=2?rest:'')}return}
+  if(/ (mode veille|mets toi en veille|va dormir|en veille) /.test(' '+plain.replace(/[^a-z0-9]+/g,' ')+' ')&&mode==='idle'){say("Mise en veille, Monsieur. Dites mon nom pour me réveiller.");setTimeout(enterStandby,2600);return}
   if(WAKE.test(plain)){const rest=raw.replace(/\b(hey|eh|ok|dis|salut|bonjour)?\s*(ultron|ultrons|ultra|ultrone|hultron|ul tron|eltron|altron|oultron|ultrom)\b[\s,.!?]*/i,' ').trim();
-    attentiveUntil=performance.now()+12000;if(rest.replace(/[^a-zà-ÿ0-9]/gi,'').length<2){say(["Oui, Monsieur ?","Je vous écoute, Monsieur.","À votre service, Monsieur."][Math.floor(Math.random()*3)]);return}handle(rest);return}
+    attentiveUntil=performance.now()+12000;ignite();if(rest.replace(/[^a-zà-ÿ0-9]/gi,'').length<2){say(["Oui, Monsieur ?","Je vous écoute, Monsieur.","À votre service, Monsieur."][Math.floor(Math.random()*3)]);return}handle(rest);return}
   handle(raw)}
 function handle(raw){const t=norm(raw);if(!t.trim())return;attentiveUntil=performance.now()+15000;
   if(journalOpen){journalCmd(raw,t);return}
@@ -1068,6 +1078,40 @@ $('socr').onclick=e=>{e.stopPropagation();sres.hidden=true;frz.hidden=true;scanV
 $('sjr').onclick=e=>{e.stopPropagation();if(!lastScan)return;const o=lastScan;jWrite(`Scan : ${o.nom}. ${(o.details||[]).map(d=>d.join(' ')).join(', ')}`);say("C'est noté dans votre journal, Monsieur.")};
 sres.addEventListener('pointerdown',e=>e.stopPropagation());
 
+
+// ───────── réveil par la voix : veille (écran noir), « Ultron » rallume l'orbe avec un son grave
+const sbEl=$('standby'),ember=$('ember'),EX=ember.getContext('2d');let standby=false,lastAct=performance.now(),wakeLock=null,AC2=null;
+function act(){lastAct=performance.now()}
+async function keepAwake(){try{if('wakeLock'in navigator&&!document.hidden&&!wakeLock){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null})}}catch(e){}}
+function audio(){if(!AC2){const A=window.AudioContext||window.webkitAudioContext;if(!A)return null;AC2=new A()}if(AC2.state!=='running')AC2.resume().catch(()=>{});return AC2}
+function boom(){const c=audio();if(!c)return;const t=c.currentTime,out=c.createGain();out.gain.value=.9;
+  // réverbération synthétique
+  const len=c.sampleRate*2.4,ir=c.createBuffer(2,len,c.sampleRate);for(let ch=0;ch<2;ch++){const d=ir.getChannelData(ch);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3.2)}
+  const rv=c.createConvolver();rv.buffer=ir;const wet=c.createGain();wet.gain.value=.35;out.connect(c.destination);out.connect(rv);rv.connect(wet);wet.connect(c.destination);
+  const env=(g,a,peak,d)=>{g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+a+d)};
+  // impact
+  const o1=c.createOscillator(),g1=c.createGain();o1.type='sine';o1.frequency.setValueAtTime(140,t);o1.frequency.exponentialRampToValueAtTime(34,t+.5);env(g1,.01,.9,1.1);o1.connect(g1);g1.connect(out);o1.start(t);o1.stop(t+1.3);
+  // grondement sub
+  const o2=c.createOscillator(),g2=c.createGain();o2.type='sine';o2.frequency.setValueAtTime(48,t);o2.frequency.linearRampToValueAtTime(38,t+2.4);env(g2,.25,.55,2.4);o2.connect(g2);g2.connect(out);o2.start(t);o2.stop(t+2.8);
+  // texture métallique
+  const o3=c.createOscillator(),f3=c.createBiquadFilter(),g3=c.createGain();o3.type='sawtooth';o3.frequency.setValueAtTime(82,t);o3.frequency.linearRampToValueAtTime(73,t+2);f3.type='lowpass';f3.frequency.setValueAtTime(900,t);f3.frequency.exponentialRampToValueAtTime(120,t+2);f3.Q.value=6;env(g3,.08,.16,1.9);o3.connect(f3);f3.connect(g3);g3.connect(out);o3.start(t);o3.stop(t+2.3);
+  // souffle
+  const nb=c.createBuffer(1,c.sampleRate,c.sampleRate),nd=nb.getChannelData(0);for(let i=0;i<nd.length;i++)nd[i]=Math.random()*2-1;const ns=c.createBufferSource(),fn=c.createBiquadFilter(),gn=c.createGain();ns.buffer=nb;fn.type='bandpass';fn.frequency.setValueAtTime(2200,t);fn.frequency.exponentialRampToValueAtTime(300,t+.8);env(gn,.02,.12,.8);ns.connect(fn);fn.connect(gn);gn.connect(out);ns.start(t)}
+function ignite(){boom();app.classList.remove('ignite');void app.offsetWidth;app.classList.add('ignite');const p=orbPos(),f=document.createElement('div');f.className='flash';f.style.setProperty('--fx',p.x+'px');f.style.setProperty('--fy',p.y+'px');app.appendChild(f);setTimeout(()=>f.remove(),1500);orbPulse(1.4);setTimeout(()=>orbPulse(1),260)}
+function enterStandby(){if(standby||locked||mode!=='idle')return;standby=true;sbEl.hidden=false;requestAnimationFrame(()=>sbEl.classList.add('on'));
+  // économie : caméra coupée pendant la veille, le micro reste à l'écoute du mot « Ultron »
+  if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;camOn=false}keepAwake();emberLoop()}
+function wakeUp(rest){if(!standby)return;standby=false;sbEl.classList.remove('on');setTimeout(()=>{if(!standby)sbEl.hidden=true},1200);act();ignite();startCam();
+  setTimeout(()=>{if(rest)handle(rest);else say(["Oui, Monsieur ?","Je suis là, Monsieur.","À votre service, Monsieur."][Math.floor(Math.random()*3)])},900)}
+function emberLoop(){if(!standby)return;const d=Math.min(2,devicePixelRatio||1),S=180*d;if(ember.width!==S){ember.width=ember.height=S}const t=performance.now()/1000,c=S/2,b=.5+.5*Math.sin(t*1.3);
+  EX.clearRect(0,0,S,S);const g=EX.createRadialGradient(c,c,0,c,c,S/2);g.addColorStop(0,`rgba(255,30,45,${.16+b*.12})`);g.addColorStop(.25,`rgba(160,0,20,${.08+b*.05})`);g.addColorStop(1,'rgba(0,0,0,0)');EX.fillStyle=g;EX.fillRect(0,0,S,S);
+  EX.fillStyle=`rgba(255,60,70,${.35+b*.3})`;EX.beginPath();EX.arc(c,c,3*d,0,7);EX.fill();requestAnimationFrame(emberLoop)}
+sbEl.addEventListener('pointerdown',e=>{e.stopPropagation();audio();wakeUp()});
+// mise en veille automatique après 2 minutes sans activité sur l'écran principal
+setInterval(()=>{if(started&&!locked&&!standby&&mode==='idle'&&!speaking&&!thinking&&performance.now()-lastAct>120000)enterStandby()},5000);
+['pointerdown','touchstart','keydown'].forEach(ev=>addEventListener(ev,()=>{act();audio()},{passive:true,capture:true}));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)keepAwake()});
+
 // ───────── toucher
 const ptrs=new Map();let downT=0,pz=null,downAt=null,moved=false,lastTap=0,lpT=null;
 const pos=e=>({x:e.clientX,y:e.clientY});
@@ -1090,12 +1134,12 @@ app.addEventListener('pointerup',up);app.addEventListener('pointercancel',up);
 convoEl.addEventListener('pointerdown',e=>{e.stopPropagation();lpT=setTimeout(()=>{lpT='done';askKey()},700)});
 convoEl.addEventListener('pointerup',e=>{e.stopPropagation();if(lpT==='done'){lpT=null;return}clearTimeout(lpT);lpT=null;if(!started)start();else micToggle()});
 
-function start(msg){started=true;setTimeout(()=>{if(SR&&!rec&&!needTap)showHeard('🎙 Démarrage du micro…',false)},800);say(msg||"Bonjour Monsieur. Tous mes systèmes sont en ligne.");micOn=!!SR;setConvo();setTimeout(recStart,2500);startCam()}
+function start(msg){started=true;keepAwake();audio();setTimeout(()=>{if(SR&&!rec&&!needTap)showHeard('🎙 Démarrage du micro…',false)},800);say(msg||"Bonjour Monsieur. Tous mes systèmes sont en ligne.");micOn=!!SR;setConvo();setTimeout(recStart,2500);startCam()}
 startCam();faceGate();
 
 // ───────── appli fermée : micro et caméra coupés
 let micWasOn=false;
-function sleepAll(){if(mode==='scan')closeScan(true);hiddenAt=Date.now();if(STT.state==='rec')sttStop(false);if(STT.stream){STT.stream.getTracks().forEach(t=>t.stop());STT.stream=null;clearInterval(STT.timer);try{STT.ctx.close()}catch(e){}STT.ctx=null;STT.state='idle'}micWasOn=micOn;micOn=false;recPause();setConvo();try{speechSynthesis.cancel()}catch(e){}speaking=false;
+function sleepAll(){if(standby){standby=false;sbEl.hidden=true;sbEl.classList.remove('on')}try{wakeLock&&wakeLock.release()}catch(e){}wakeLock=null;if(mode==='scan')closeScan(true);hiddenAt=Date.now();if(STT.state==='rec')sttStop(false);if(STT.stream){STT.stream.getTracks().forEach(t=>t.stop());STT.stream=null;clearInterval(STT.timer);try{STT.ctx.close()}catch(e){}STT.ctx=null;STT.state='idle'}micWasOn=micOn;micOn=false;recPause();setConvo();try{speechSynthesis.cancel()}catch(e){}speaking=false;
   if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null}camOn=false;const v=$('cam');v.srcObject=null;const st=$('camst');st.hidden=false;st.textContent='Caméra en pause'}
 function wakeAll(){startCam();if(Date.now()-hiddenAt>30000){faceGate();return}if(micWasOn||!userMicOff){micOn=true;setConvo();setTimeout(recStart,600)}}
 document.addEventListener('visibilitychange',()=>{document.hidden?sleepAll():wakeAll()});
