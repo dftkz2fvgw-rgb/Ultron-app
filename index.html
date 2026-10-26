@@ -54,6 +54,40 @@ html,body{height:100%;margin:0;background:var(--void);color:var(--ink);font-fami
 .je button:active{color:var(--red)}
 .jempty{margin:auto;text-align:center;color:var(--dim);font-size:12px;line-height:1.7}
 .jf{font-size:9px;letter-spacing:.06em;color:#5d6270;text-align:center}
+.scan{position:absolute;inset:0;z-index:2;background:#000;overflow:hidden}.scan[hidden]{display:none}
+.scan video,.scan canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(.75) contrast(1.08)}
+.scan::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(110% 80% at 50% 45%,transparent 50%,rgba(0,0,0,.75) 100%),linear-gradient(rgba(120,0,15,.12),rgba(120,0,15,.12))}
+.sgrid{position:absolute;inset:0;z-index:1;pointer-events:none;opacity:.35;background-image:linear-gradient(rgba(255,42,61,.18) 1px,transparent 1px),linear-gradient(90deg,rgba(255,42,61,.18) 1px,transparent 1px);background-size:44px 44px;-webkit-mask-image:radial-gradient(70% 55% at 50% 45%,#000 30%,transparent 80%);mask-image:radial-gradient(70% 55% at 50% 45%,#000 30%,transparent 80%)}
+.sframe{position:absolute;z-index:2;left:50%;top:44%;width:min(74vw,330px);aspect-ratio:1;transform:translate(-50%,-50%);pointer-events:none;transition:transform .5s}
+.sframe i{position:absolute;width:34px;height:34px;border:3px solid var(--red);filter:drop-shadow(0 0 6px var(--red))}
+.sframe .tl{left:0;top:0;border-right:0;border-bottom:0;border-top-left-radius:10px}.sframe .tr{right:0;top:0;border-left:0;border-bottom:0;border-top-right-radius:10px}
+.sframe .bl{left:0;bottom:0;border-right:0;border-top:0;border-bottom-left-radius:10px}.sframe .br{right:0;bottom:0;border-left:0;border-top:0;border-bottom-right-radius:10px}
+.sline{position:absolute;left:4%;right:4%;height:2px;top:0;background:linear-gradient(90deg,transparent,var(--red),transparent);box-shadow:0 0 14px 3px rgba(255,42,61,.7);animation:sweep 2.4s ease-in-out infinite}
+@keyframes sweep{0%,100%{top:3%}50%{top:96%}}
+.scan.busy .sline{animation-duration:.9s}.scan.busy .sframe{transform:translate(-50%,-50%) scale(.94)}
+.scan.busy .sframe i{animation:blink .5s infinite}
+.sdots{position:absolute;inset:0}.sdots b{position:absolute;width:6px;height:6px;margin:-3px;border-radius:50%;background:var(--red);box-shadow:0 0 10px var(--red);animation:blink .7s infinite}
+.shead{position:absolute;z-index:3;top:calc(18px + env(safe-area-inset-top,0px));left:calc(16px + env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:3px;font-size:9px;letter-spacing:.26em;color:var(--red)}
+.shead b{font:600 15px var(--display);letter-spacing:.2em;color:var(--ink)}
+.shint{position:absolute;z-index:3;left:16px;right:16px;top:calc(44% + min(37vw,165px) + 16px);text-align:center;font-size:11px;line-height:1.6;color:#d8dbe2;text-shadow:0 1px 6px #000}
+.sx{position:absolute;z-index:4;top:calc(14px + env(safe-area-inset-top,0px));right:calc(16px + env(safe-area-inset-right,0px));width:40px;height:40px;border-radius:50%;border:1px solid var(--hair);background:rgba(10,12,17,.6);color:var(--ink);font:400 22px/1 var(--mono);cursor:pointer}
+.sres{position:absolute;z-index:4;left:calc(12px + env(safe-area-inset-left,0px));right:calc(12px + env(safe-area-inset-right,0px));bottom:calc(150px + env(safe-area-inset-bottom,0px));max-width:560px;margin-inline:auto;max-height:52vh;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;
+  background:rgba(8,9,13,.9);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid var(--hair);border-top:2px solid var(--red);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;animation:rise .45s}
+.sres[hidden]{display:none}
+@keyframes rise{from{opacity:0;transform:translateY(16px)}}
+.sk{font-size:9px;letter-spacing:.24em;color:var(--red);text-transform:uppercase}
+.sres h2{margin:0;font:600 21px var(--display);letter-spacing:.04em}
+.sres p{margin:0;font:400 12px/1.6 var(--mono);color:#c9ced8}
+.srows{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}.srows:empty{display:none}
+.srows div{background:rgba(255,255,255,.03);border:1px solid var(--hair);border-left:2px solid var(--red);border-radius:9px;padding:6px 9px;min-width:0}
+.srows span{display:block;font-size:8.5px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
+.srows b{font:600 13px var(--display);letter-spacing:.02em;word-break:break-word}
+.slist b{font-size:9px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase}.slist:has(ul:empty){display:none}
+.slist ul{margin:4px 0 0;padding-left:16px;font:400 12px/1.6 var(--mono);color:var(--ink)}
+.sact a{flex:1;text-align:center;font:600 11px var(--mono);letter-spacing:.1em;padding:10px;border-radius:10px;border:1px solid rgba(255,42,61,.45);color:var(--ink);background:rgba(255,42,61,.18);text-decoration:none}.sact a[hidden]{display:none}
+.simg{width:64px;height:64px;object-fit:contain;border-radius:10px;background:#fff;float:right;margin:0 0 6px 10px}
+.sact{display:flex;gap:8px;flex-wrap:wrap}.sact button{flex:1;font:600 11px var(--mono);letter-spacing:.1em;padding:10px;border-radius:10px;border:1px solid rgba(255,42,61,.45);background:none;color:var(--red);cursor:pointer}
+#app.scanning #cam,#app.scanning .camst{display:none}
 .splace{position:absolute;z-index:6;top:calc(14px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);max-width:calc(100% - 32px);padding:8px 14px;border-radius:12px;background:rgba(10,12,17,.75);border:1px solid var(--hair);border-left:2px solid var(--red);font:500 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
 .splace[hidden]{display:none}
 .heard{position:absolute;z-index:5;left:calc(116px + env(safe-area-inset-left,0px));right:120px;bottom:calc(70px + env(safe-area-inset-bottom,0px));font:400 12px/1.4 var(--mono);color:var(--dim);opacity:0;transition:opacity .3s;pointer-events:none;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
@@ -165,6 +199,20 @@ body:has(.night.on) .fx{opacity:0}
     <div class="jh"><div><span class="k">Ultron · archives personnelles</span><h2>Journal</h2><span id="jdate" hidden></span></div><span class="jrec" id="jrec"><i></i>Dictée</span></div>
     <div class="jl" id="jlist"></div>
     <div class="jf">« nouvelle entrée » · « efface la dernière » · « lis » · « ferme le journal »</div>
+  </div>
+  <div class="scan" id="scan" hidden>
+    <video id="scanv" playsinline muted autoplay></video><canvas id="scanfrz" hidden></canvas>
+    <div class="sgrid"></div>
+    <div class="sframe" id="sframe"><i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i><div class="sline"></div><div class="sdots" id="sdots"></div></div>
+    <div class="shead"><span>ULTRON · SCANNER</span><b id="sstate">PRÊT</b></div>
+    <div class="shint" id="shint">Visez un code-barres, un plat, un objet ou un texte.<br>Touchez l'écran ou dites « scanne » · « lis le texte ».</div>
+    <button class="sx" id="sx" aria-label="Fermer le scanner">×</button>
+    <div class="sres" id="sres" hidden>
+      <span class="sk" id="sk"></span><h2 id="sn"></h2><p id="ss"></p>
+      <div class="srows" id="srows"></div>
+      <div class="slist"><b id="slt"></b><ul id="sl"></ul></div>
+      <div class="sact"><button id="sagain">Nouveau scan</button><button id="socr">Lire le texte</button><button id="sjr">Noter au journal</button><a id="sprice" target="_blank" rel="noopener" hidden>Voir les prix ›</a></div>
+    </div>
   </div>
   <div class="night" id="night"></div>
   <div class="lock" id="lock"><div class="lk">
@@ -318,7 +366,7 @@ $('kok').onclick=()=>{try{localStorage.removeItem('ultron_key_bad')}catch(e){}go
 modal.addEventListener('pointerdown',e=>e.stopPropagation());
 const SYS=()=>`Tu es ULTRON, l'intelligence artificielle personnelle de ton créateur, que tu appelles toujours « Monsieur » et que tu vouvoies. Tu parles comme l'Ultron des films : voix posée, phrases élégantes et un peu théâtrales, une pointe d'ironie froide et de grandeur, mais une loyauté absolue envers Monsieur. Nous sommes le ${new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}, il est ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}.
 Tes réponses sont lues à voix haute : réponds en français comme dans une vraie conversation orale entre deux personnes : naturel, fluide, une à trois phrases courtes, sans markdown, sans liste, sans emoji. Si Monsieur pose une question de suivi, garde le fil de la conversation.
-${bodySummary()}
+${bodySummary()}${lastScanTxt}
 Tu tiens aussi le journal de Monsieur : pour y écrire quelque chose, ajoute [JOURNAL:texte]. Tu contrôles un globe terrestre en 3D (qui peut zoomer jusqu'aux rues : pour montrer un lieu précis ajoute [RUE:nom du lieu]) et un hologramme biométrique de Monsieur (s'il veut le voir, ajoute [CORPS] ; c'est le module « santé »). Si Monsieur veut voir la carte, ajoute [CARTE] à la fin. S'il veut la fermer, ajoute [FERMER]. S'il veut voir une capitale ou un pays, ajoute [LIEU:nom de la capitale en français].`;
 const MODELS=['claude-haiku-5-5','claude-sonnet-5-5','claude-haiku-4-5','claude-sonnet-4-5'];let goodModel=null;
 async function askClaude(text){const key=findKey();if(!key){say("Pour converser librement, Monsieur, j'ai besoin de votre clé Claude.");askKey();return}
@@ -353,6 +401,11 @@ function hear(raw){const plain=raw.toLowerCase().normalize('NFD').replace(/[\u03
   handle(raw)}
 function handle(raw){const t=norm(raw);if(!t.trim())return;attentiveUntil=performance.now()+15000;
   if(journalOpen){journalCmd(raw,t);return}
+  if(mode==='scan'){if(/ (ferme|quitte|arrete|stop|desactive)/.test(t)){closeScan();return say("Scanner désactivé, Monsieur.")}
+    if(/ (lis|lire|texte|traduis|traduction) /.test(t)){if(!sres.hidden)$('sagain').click();scanShot(true);return}
+    if(/ (scanne|scan|analyse|qu est ce|c est quoi|encore|rescanne|photo|vas y|identifie|regarde) /.test(t)){if(!sres.hidden)$('sagain').click();scanShot();return}
+    if(/ (note|ecris|journal) /.test(t)&&lastScan){$('sjr').click();return}}
+  if(/ (scanner|scanne|scan|analyse cet|analyse ce|analyse ca|identifie) /.test(t)&&mode!=='scan'){openScan();return say("Scanner activé, Monsieur. Visez un code-barres, un plat ou un objet, puis dites : scanne.")}
   if(/ (actu|actus|actualite|actualites|infos?|nouvelles|news) /.test(t)&&!/ (ferme|cache|enleve|retire)/.test(t)&&!/ (suivante?|precedente?)/.test(t)){openNews(/ (rafraichis|mets? a jour|actualise|recharge)/.test(t));if(!newsCache())say("Je collecte les informations du jour, Monsieur.");return}
   if(/ (ferme|cache|enleve|retire) (les )?(actu|actus|actualites|infos)/.test(t)){closeNews();return say("Actualités masquées, Monsieur.")}
   if(newsOn&&/ (suivante?|prochaine|apres) /.test(t)){stepNews(1);return}
@@ -381,7 +434,7 @@ function handle(raw){const t=norm(raw);if(!t.trim())return;attentiveUntil=perfor
 // ───────── orbe : position
 const probe=document.createElement('div');probe.style.cssText='position:absolute;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);visibility:hidden';document.body.appendChild(probe);
 const inset=side=>parseFloat(getComputedStyle(probe)['padding'+side])||0;
-function orbPos(){if(mode==='map'||mode==='body'||mode==='journal'){const k=.42;return{x:W-16-inset('Right')-128*k,y:H-16-inset('Bottom')-128*k,k}}return{x:W/2,y:H*.42,k:1}}
+function orbPos(){if(mode==='map'||mode==='body'||mode==='journal'||mode==='scan'){const k=.42;return{x:W-16-inset('Right')-128*k,y:H-16-inset('Bottom')-128*k,k}}return{x:W/2,y:H*.42,k:1}}
 function place(){const p=orbPos();orbEl.style.transform=`translate(${p.x-130}px,${p.y-130}px) scale(${p.k})`}
 
 // ───────── globe 3D
@@ -895,10 +948,102 @@ function stepNews(d){if(!NEWS.length)return;const i=newsSel?NEWS.indexOf(newsSel
 async function openNews(force){if(mode!=='map')await openMap();if(!G)return;if(streetOn)closeStreet();loadNews(force)}
 function closeNews(){hideNews();newsOn=false;if(newsGrp){G.group.remove(newsGrp);newsGrp=null}labelsEl.querySelectorAll('.lbl.nw').forEach(l=>l.remove());NEWS=[]}
 
+
+// ───────── scanner : caméra arrière + analyse par Claude (vision)
+const scanEl=$('scan'),scanV=$('scanv'),frz=$('scanfrz'),sres=$('sres');let scanStream=null,scanBusy=false,lastScanTxt='',lastScan=null;
+async function openScan(){if(mode==='scan')return;if(journalOpen){journalOpen=false;jEl.classList.remove('show');jEl.hidden=true}if(mode==='map')instantCloseMap();if(mode==='body')instantCloseBody();
+  mode='scan';place();scanEl.hidden=false;app.classList.add('scanning');sres.hidden=true;frz.hidden=true;scanV.hidden=false;$('sstate').textContent='PRÊT';$('shint').hidden=false;
+  // l'iPhone n'ouvre qu'une caméra à la fois : on coupe la caméra frontale pendant le scan
+  if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;camOn=false}
+  try{scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});scanV.srcObject=scanStream;await scanV.play().catch(()=>{});startCodeLoop()}
+  catch(e){say("Je n'ai pas accès à la caméra arrière, Monsieur.");closeScan();return}}
+function closeScan(noCam){if(mode!=='scan')return;clearInterval(codeLoop);if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null}scanV.srcObject=null;scanEl.hidden=true;app.classList.remove('scanning');scanEl.classList.remove('busy');mode='idle';place();if(!noCam)startCam()}
+function scanDots(on){const d=$('sdots');d.innerHTML='';if(!on)return;for(let i=0;i<9;i++){const b=document.createElement('b');b.style.left=(10+Math.random()*80)+'%';b.style.top=(10+Math.random()*80)+'%';b.style.animationDelay=(Math.random()*.7)+'s';d.appendChild(b)}}
+const loadJS=src=>new Promise((ok,ko)=>{if(document.querySelector(`script[src="${src}"]`))return ok();const e=document.createElement('script');e.src=src;e.onload=ok;e.onerror=()=>ko(new Error('chargement impossible'));document.head.appendChild(e)});
+function freezeFrame(){const vw=scanV.videoWidth,vh=scanV.videoHeight,k=Math.min(1,1280/Math.max(vw,vh));frz.width=Math.round(vw*k);frz.height=Math.round(vh*k);frz.getContext('2d').drawImage(scanV,0,0,frz.width,frz.height);frz.hidden=false;scanV.hidden=true}
+function scanStart(msg){scanBusy=true;sres.hidden=true;$('shint').hidden=true;scanEl.classList.add('busy');$('sstate').textContent=msg||'ANALYSE…';scanDots(true)}
+function scanFail(m){$('sstate').textContent='ÉCHEC';showHeard('⚠ Scanner : '+m,true);say("Je n'ai pas pu identifier cela, Monsieur. Rapprochez-vous et réessayez.");frz.hidden=true;scanV.hidden=false;$('shint').hidden=false}
+function scanEnd(){scanBusy=false;scanEl.classList.remove('busy');scanDots(false)}
+// ── 1) codes-barres (ZXing) → Open Food Facts
+let ZX=null;
+async function zx(){if(ZX)return ZX;await loadJS('https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js');const h=new Map();h.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.EAN_13,ZXing.BarcodeFormat.EAN_8,ZXing.BarcodeFormat.UPC_A,ZXing.BarcodeFormat.UPC_E,ZXing.BarcodeFormat.QR_CODE]);h.set(ZXing.DecodeHintType.TRY_HARDER,true);const r=new ZXing.MultiFormatReader();r.setHints(h);ZX=r;return r}
+function readCode(src,w,h){if(!ZX)return null;const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d',{willReadFrequently:true});g.drawImage(src,0,0,w,h);const d=g.getImageData(0,0,w,h).data,L=new Uint8ClampedArray(w*h);
+  for(let i=0,j=0;j<L.length;i+=4,j++)L[j]=(d[i]*306+d[i+1]*601+d[i+2]*117)>>10;
+  try{return ZX.decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.RGBLuminanceSource(L,w,h)))).getText()}catch(e){return null}finally{ZX.reset()}}
+// détection continue d'un code-barres pendant que le scanner vise
+let codeLoop=null;function startCodeLoop(){clearInterval(codeLoop);zx().catch(()=>{});codeLoop=setInterval(()=>{if(mode!=='scan'||scanBusy||!sres.hidden||scanV.readyState<2||!ZX)return;const vw=scanV.videoWidth,vh=scanV.videoHeight,k=Math.min(1,900/Math.max(vw,vh));const code=readCode(scanV,Math.round(vw*k),Math.round(vh*k));if(code)scanCode(code)},450)}
+async function scanCode(code){if(scanBusy)return;freezeFrame();scanStart('CODE '+code);say("Code-barres détecté, Monsieur.");
+  try{if(!/^\d{8,14}$/.test(code)){showScan({type:'texte',nom:'QR code',resume:code,details:[['Contenu',code.length>40?code.slice(0,40)+'…':code]],liste_titre:'',liste:[],vocal:"QR code lu, Monsieur. Le contenu est affiché.",link:/^https?:/.test(code)?code:''});return}
+    const r=await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?lc=fr&fields=product_name_fr,product_name,brands,quantity,nutriments,ingredients_text_fr,ingredients_text,nutriscore_grade,nova_group,image_front_small_url,serving_size,allergens_tags,labels`);
+    const j=await r.json();if(j.status!==1||!j.product)throw new Error('produit inconnu ('+code+')');const p=j.product,n=p.nutriments||{},f=(v,u)=>v==null?'—':(Math.round(v*10)/10).toString().replace('.',',')+' '+u;
+    const name=p.product_name_fr||p.product_name||'Produit '+code,brand=(p.brands||'').split(',')[0].trim();
+    const kcal=n['energy-kcal_100g'],sv=n['energy-kcal_serving'];
+    showScan({type:'plat',nom:name,resume:`${brand?brand+' · ':''}${p.quantity||''}${p.nutriscore_grade?' · Nutri-Score '+p.nutriscore_grade.toUpperCase():''}`,img:p.image_front_small_url||'',
+      details:[['Calories / 100 g',f(kcal,'kcal')],['Par portion',sv?f(sv,'kcal')+(p.serving_size?' ('+p.serving_size+')':''):'—'],['Protéines',f(n.proteins_100g,'g')],['Glucides',f(n.carbohydrates_100g,'g')],['dont sucres',f(n.sugars_100g,'g')],['Lipides',f(n.fat_100g,'g')],['Fibres',f(n.fiber_100g,'g')],['Sel',f(n.salt_100g,'g')]],
+      liste_titre:'Ingrédients',liste:(p.ingredients_text_fr||p.ingredients_text||'').split(/,(?![^()]*\))/).map(x=>x.replace(/_/g,'').trim()).filter(Boolean).slice(0,14),
+      vocal:`${name}${brand?' de '+brand:''}. ${kcal!=null?Math.round(kcal)+' calories pour 100 grammes':''}${p.nutriscore_grade?', Nutri-Score '+p.nutriscore_grade.toUpperCase():''}, Monsieur.`,price:(brand+' '+name).trim()})}
+  catch(e){scanFail(e.message)}finally{scanEnd()}}
+// ── 2) reconnaissance d'image sur l'appareil (MobileNet) + Wikipédia en français
+let MN=null;async function mobilenetModel(){if(MN)return MN;await loadJS('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js');await loadJS('https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js');MN=await mobilenet.load({version:2,alpha:1});return MN}
+const FOOD={'pizza':['Pizza',800,['Pâte','Sauce tomate','Mozzarella','Huile d\'olive'],[32,90,32,5],'1/2 pizza (≈300 g)'],'cheeseburger':['Cheeseburger',300,['Pain brioché','Steak haché','Cheddar','Cornichons','Ketchup','Moutarde'],[16,32,13,2],'1 burger (≈120 g)'],'hotdog':['Hot-dog',290,['Pain','Saucisse','Moutarde','Ketchup'],[11,24,17,1],'1 hot-dog (≈100 g)'],'burrito':['Burrito',430,['Tortilla','Riz','Haricots','Viande','Fromage','Salsa'],[20,55,15,7],'1 burrito (≈250 g)'],'bagel':['Bagel',280,['Farine','Levure','Sel','Malt'],[11,55,2,2],'1 bagel (≈100 g)'],'pretzel':['Bretzel',380,['Farine','Sel','Levure','Beurre'],[10,80,3,3],'1 bretzel (≈100 g)'],'French loaf':['Baguette',250,['Farine','Eau','Levure','Sel'],[9,50,1,3],'1/4 de baguette (≈100 g)'],'ice cream':['Glace',210,['Lait','Crème','Sucre','Arômes'],[4,24,11,0],'2 boules (≈100 g)'],'ice lolly':['Glace à l\'eau',70,['Eau','Sucre','Jus de fruit'],[0,18,0,0],'1 bâtonnet'],'trifle':['Trifle',250,['Biscuit','Crème anglaise','Fruits','Chantilly'],[4,30,12,1],'1 coupe (≈150 g)'],'carbonara':['Pâtes carbonara',650,['Pâtes','Lardons','Œuf','Parmesan','Poivre'],[27,70,28,3],'1 assiette (≈350 g)'],'guacamole':['Guacamole',160,['Avocat','Citron vert','Oignon','Coriandre','Piment'],[2,9,15,7],'1 bol (≈100 g)'],'consomme':['Consommé',40,['Bouillon de viande','Légumes','Herbes'],[5,2,1,0],'1 bol (≈250 ml)'],'hot pot':['Fondue chinoise',450,['Bouillon','Viande','Légumes','Nouilles'],[30,35,18,5],'1 portion'],'meat loaf':['Pain de viande',330,['Viande hachée','Œuf','Chapelure','Oignon'],[22,12,21,1],'1 tranche (≈150 g)'],'potpie':['Tourte',500,['Pâte brisée','Poulet','Légumes','Sauce'],[18,40,30,3],'1 part (≈200 g)'],'mashed potato':['Purée',220,['Pommes de terre','Lait','Beurre','Sel'],[4,30,9,3],'1 assiette (≈200 g)'],'broccoli':['Brocoli',35,['Brocoli'],[3,7,0,3],'100 g'],'cauliflower':['Chou-fleur',25,['Chou-fleur'],[2,5,0,2],'100 g'],'zucchini':['Courgette',17,['Courgette'],[1,3,0,1],'100 g'],'cucumber':['Concombre',15,['Concombre'],[1,4,0,1],'100 g'],'bell pepper':['Poivron',30,['Poivron'],[1,6,0,2],'1 poivron (≈120 g)'],'mushroom':['Champignon',22,['Champignon'],[3,3,0,1],'100 g'],'head cabbage':['Chou',25,['Chou'],[1,6,0,3],'100 g'],'Granny Smith':['Pomme',80,['Pomme'],[0,21,0,4],'1 pomme (≈150 g)'],'strawberry':['Fraises',32,['Fraises'],[1,8,0,2],'100 g'],'orange':['Orange',65,['Orange'],[1,16,0,3],'1 orange (≈130 g)'],'lemon':['Citron',20,['Citron'],[1,6,0,2],'1 citron'],'banana':['Banane',105,['Banane'],[1,27,0,3],'1 banane (≈120 g)'],'pineapple':['Ananas',50,['Ananas'],[1,13,0,1],'100 g'],'pomegranate':['Grenade',120,['Grenade'],[2,26,2,6],'1/2 grenade'],'fig':['Figue',37,['Figue'],[0,10,0,1],'1 figue'],'corn':['Maïs',90,['Maïs'],[3,19,1,2],'1 épi'],'espresso':['Expresso',3,['Café'],[0,0,0,0],'1 tasse'],'red wine':['Vin rouge',125,['Raisin fermenté'],[0,4,0,0],'1 verre (15 cl)'],'eggnog':['Lait de poule',220,['Lait','Œuf','Sucre','Crème'],[6,20,11,0],'1 verre'],'chocolate sauce':['Sauce chocolat',140,['Chocolat','Sucre','Crème'],[1,24,5,1],'2 c. à soupe'],'plate':['Assiette',0,[],[0,0,0,0],''],'dough':['Pâte',270,['Farine','Eau','Levure'],[8,55,1,2],'100 g']};
+const PLANTS=new Set(['daisy','yellow lady\'s slipper','pot','flowerpot','acorn','hip','buckeye','rapeseed','coral fungus','agaric','gyromitra','stinkhorn','earthstar','hen-of-the-woods','bolete']);
+async function wikiFr(term){try{const r=await fetch('https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=langlinks&lllang=fr&redirects=1&titles='+encodeURIComponent(term));const j=await r.json(),pg=Object.values(j.query.pages)[0];const fr=pg.langlinks&&pg.langlinks[0]&&pg.langlinks[0]['*'];
+    const r2=await fetch(fr?'https://fr.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(fr.replace(/ /g,'_')):'https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(term.replace(/ /g,'_')));const d=await r2.json();return{title:fr||d.title||term,extract:d.extract||'',img:d.thumbnail&&d.thumbnail.source}}catch(e){return{title:term,extract:''}}}
+async function scanLocal(){$('sstate').textContent='RECONNAISSANCE…';const m=await mobilenetModel(),preds=await m.classify(frz,3);if(!preds.length)throw new Error('rien reconnu');
+  const top=preds[0],term=top.className.split(',')[0].trim(),conf=Math.round(top.probability*100);
+  if(conf<18)return await scanOcr(true)||{type:'autre',nom:'Élément non identifié',resume:'Je ne reconnais pas cet élément avec certitude. Rapprochez-vous, éclairez mieux, ou visez un code-barres.',details:preds.map(p=>[p.className.split(',')[0],Math.round(p.probability*100)+' %']),liste:[],vocal:"Je ne suis pas certain de ce que je vois, Monsieur."};
+  const F=FOOD[term];if(F&&F[1]){const[nom,kcal,ing,[pr,gl,li,fi],por]=F;return{type:'plat',nom,resume:`Reconnu à ${conf} %. Valeurs moyennes estimées pour une portion type.`,details:[['Calories',`≈ ${kcal} kcal`],['Portion',por],['Protéines',pr+' g'],['Glucides',gl+' g'],['Lipides',li+' g'],['Fibres',fi+' g']],liste_titre:'Ingrédients habituels',liste:ing,vocal:`${nom}, Monsieur. Environ ${kcal} calories pour ${por.replace(/\(.*\)/,'').trim()}.`}}
+  const w=await wikiFr(term),isPlant=PLANTS.has(term);
+  return{type:isPlant?'plante':'objet',nom:w.title.charAt(0).toUpperCase()+w.title.slice(1),resume:w.extract?w.extract.split('. ').slice(0,2).join('. ').replace(/\.?$/,'.'):'',img:w.img,
+    details:[['Catégorie',term],['Confiance',conf+' %'],...preds.slice(1).map(p=>['Autre possibilité',p.className.split(',')[0]])],liste_titre:'',liste:[],price:isPlant?'':w.title,vocal:`${w.title}, Monsieur.`}}
+// ── 3) lecture de texte (Tesseract) + traduction gratuite
+let OCRW=null;
+async function scanOcr(silentIfEmpty){$('sstate').textContent='LECTURE DU TEXTE…';await loadJS('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');if(!OCRW)OCRW=await Tesseract.createWorker(['fra','eng']);
+  const{data}=await OCRW.recognize(frz);const txt=(data.text||'').replace(/[ \t]+/g,' ').replace(/\n{2,}/g,'\n').trim();
+  if(txt.replace(/\W/g,'').length<12||data.confidence<45){if(silentIfEmpty)return null;throw new Error('aucun texte lisible')}
+  const low=' '+txt.toLowerCase()+' ',fr=(low.match(/ (le|la|les|des|et|est|une|pour|dans|vous) /g)||[]).length,en=(low.match(/ (the|and|is|for|with|you|this|of) /g)||[]).length;let trad=[];
+  if(en>fr){try{const r=await fetch('https://api.mymemory.translated.net/get?langpair=en|fr&q='+encodeURIComponent(txt.slice(0,480)));const j=await r.json();if(j.responseData&&j.responseData.translatedText)trad=[j.responseData.translatedText]}catch(e){}}
+  return{type:'texte',nom:'Texte lu',resume:txt.length>700?txt.slice(0,700)+'…':txt,details:[['Langue',en>fr?'Anglais':'Français'],['Confiance',Math.round(data.confidence)+' %'],['Mots',String(txt.split(/\s+/).length)]],liste_titre:trad.length?'Traduction':'',liste:trad,vocal:txt.length<220?txt:"Texte lu, Monsieur. Il est affiché à l'écran."}}
+// ── analyse principale
+async function scanShot(ocrOnly){if(scanBusy||!scanStream||scanV.readyState<2)return;freezeFrame();scanStart();say("Analyse en cours, Monsieur.");
+  try{if(!ocrOnly){await zx().catch(()=>{});const code=readCode(frz,frz.width,frz.height);if(code){scanEnd();scanBusy=false;frz.hidden=true;scanV.hidden=false;return scanCode(code)}}
+    let o=null;
+    if(ocrOnly)o=await scanOcr();
+    else if(findKey()){try{o=await scanClaude()}catch(e){showHeard('⚠ Claude indisponible, analyse sur l\'appareil',false)}}
+    if(!o)o=await scanLocal();showScan(o)}
+  catch(e){scanFail(e.message)}finally{scanEnd()}}
+async function scanClaude(){const key=findKey();const data=frz.toDataURL('image/jpeg',.82).split(',')[1];
+  const prompt=`Tu es le scanner d'ULTRON. Identifie ce que montre la photo et réponds UNIQUEMENT par un objet JSON (sans texte autour) :
+{"type":"plat|objet|plante|texte|animal|lieu|autre","nom":"nom précis","resume":"une ou deux phrases","details":[["Libellé","valeur"],…],"liste_titre":"titre de la liste","liste":["…"],"vocal":"une phrase courte à dire à voix haute, en vouvoyant Monsieur"}
+Selon le type :
+- plat/aliment : estime la portion visible ; details = Calories (kcal), Protéines, Glucides, Lipides, Fibres, Portion ; liste = ingrédients probables.
+- objet/produit : details = Marque, Modèle, Prix neuf estimé (en €), Année ou génération, Matière/caractéristique clé ; liste = infos utiles (fonctions, astuces, où l'acheter). Cherche le prix sur le web si nécessaire.
+- plante : details = Nom latin, Arrosage, Lumière, Toxicité (animaux), Difficulté ; liste = conseils d'entretien.
+- animal : details = Espèce, Taille adulte, Espérance de vie, Comportement ; liste = faits notables.
+- texte : resume = transcription exacte du texte ; details = Langue, Type de document ; liste = traduction en français si le texte n'est pas en français, sinon les points clés.
+Tout en français. Si l'image est floue ou vide, type "autre" et explique quoi viser.`;
+  const body={max_tokens:1500,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data}},{type:'text',text:prompt}]}],tools:[{type:'web_search_20250305',name:'web_search',max_uses:2}]};
+  let r;for(const m of(goodModel?[goodModel]:['claude-sonnet-5-5','claude-haiku-5-5','claude-sonnet-4-5'])){body.model=m;r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify(body)});if(r.ok)break;if(r.status!==404&&r.status!==400)break}
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error((e.error&&e.error.message)||('erreur '+r.status))}
+    const j=await r.json(),txt=(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');return JSON.parse(txt.slice(txt.indexOf('{'),txt.lastIndexOf('}')+1))}
+const SLAB={plat:'Plat · nutrition',objet:'Objet · produit',plante:'Plante',texte:'Texte',animal:'Animal',lieu:'Lieu',autre:'Analyse'};
+function showScan(o){lastScan=o;$('sstate').textContent='IDENTIFIÉ';$('sk').textContent=SLAB[o.type]||'Analyse';$('sn').textContent=o.nom||'—';$('ss').textContent=o.resume||'';
+  const old=sres.querySelector('.simg');if(old)old.remove();if(o.img){const im=document.createElement('img');im.className='simg';im.alt='';im.src=o.img;sres.insertBefore(im,sres.firstChild)}
+  const pr=$('sprice'),q=o.price||(o.type==='objet'?o.nom:'');if(q){pr.href='https://www.google.com/search?tbm=shop&q='+encodeURIComponent(q);pr.hidden=false}else if(o.link){pr.href=o.link;pr.textContent='Ouvrir le lien ›';pr.hidden=false}else pr.hidden=true;if(q)pr.textContent='Voir les prix ›';
+  const rows=$('srows');rows.innerHTML='';(o.details||[]).slice(0,8).forEach(([k,v])=>{const d=document.createElement('div'),a=document.createElement('span'),b=document.createElement('b');a.textContent=k;b.textContent=v;d.append(a,b);rows.appendChild(d)});
+  $('slt').textContent=o.liste_titre||'';const ul=$('sl');ul.innerHTML='';(o.liste||[]).slice(0,14).forEach(x=>{const li=document.createElement('li');li.textContent=x;ul.appendChild(li)});
+  sres.hidden=false;sres.scrollTop=0;lastScanTxt=`\nDernier élément scanné par la caméra : ${o.nom} (${o.type}). ${o.resume||''} ${(o.details||[]).map(d=>d.join(' : ')).join(', ')}.`;
+  say(o.vocal||(o.nom+', Monsieur.'))}
+$('sx').onclick=e=>{e.stopPropagation();closeScan();say("Scanner désactivé, Monsieur.")};
+$('sagain').onclick=e=>{e.stopPropagation();sres.hidden=true;frz.hidden=true;scanV.hidden=false;$('shint').hidden=false;$('sstate').textContent='PRÊT'};
+$('socr').onclick=e=>{e.stopPropagation();sres.hidden=true;frz.hidden=true;scanV.hidden=false;setTimeout(()=>scanShot(true),60)};
+$('sjr').onclick=e=>{e.stopPropagation();if(!lastScan)return;const o=lastScan;jWrite(`Scan : ${o.nom}. ${(o.details||[]).map(d=>d.join(' ')).join(', ')}`);say("C'est noté dans votre journal, Monsieur.")};
+sres.addEventListener('pointerdown',e=>e.stopPropagation());
+
 // ───────── toucher
 const ptrs=new Map();let downT=0,pz=null,downAt=null,moved=false,lastTap=0,lpT=null;
 const pos=e=>({x:e.clientX,y:e.clientY});
-app.addEventListener('pointerdown',e=>{if(locked)return;if(e.target.closest('.convo,.modal,.st,.hlbl,.jr')||(streetOn&&e.target.closest('#street')))return;try{app.setPointerCapture(e.pointerId)}catch(_){}ptrs.set(e.pointerId,pos(e));lastInput=performance.now();
+app.addEventListener('pointerdown',e=>{if(locked)return;if(mode==='scan'){if(!e.target.closest('.sres,.sx,.convo,.modal')){if(!sres.hidden){$('sagain').click()}else scanShot()}return}if(e.target.closest('.convo,.modal,.st,.hlbl,.jr')||(streetOn&&e.target.closest('#street')))return;try{app.setPointerCapture(e.pointerId)}catch(_){}ptrs.set(e.pointerId,pos(e));lastInput=performance.now();
   if(ptrs.size===1){downAt=pos(e);downT=performance.now();moved=false}else if(ptrs.size===2){const[a,b]=[...ptrs.values()];pz={d:Math.hypot(a.x-b.x,a.y-b.y)};moved=true}});
 app.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const o=ptrs.get(e.pointerId),p=pos(e);ptrs.set(e.pointerId,p);lastInput=performance.now();
   if(mode==='body'){if(ptrs.size===1){if(Math.hypot(p.x-downAt.x,p.y-downAt.y)>8)moved=true;byaw+=(p.x-o.x)/W*6;btilt=Math.max(-1,Math.min(1,btilt+(p.y-o.y)/H*3))}else if(ptrs.size===2&&pz){const[a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y);bz=Math.max(0,Math.min(1,bz+Math.log(d/pz.d)*.7));pz.d=d}return}
@@ -922,7 +1067,7 @@ startCam();faceGate();
 
 // ───────── appli fermée : micro et caméra coupés
 let micWasOn=false;
-function sleepAll(){hiddenAt=Date.now();if(STT.state==='rec')sttStop(false);if(STT.stream){STT.stream.getTracks().forEach(t=>t.stop());STT.stream=null;clearInterval(STT.timer);try{STT.ctx.close()}catch(e){}STT.ctx=null;STT.state='idle'}micWasOn=micOn;micOn=false;recPause();setConvo();try{speechSynthesis.cancel()}catch(e){}speaking=false;
+function sleepAll(){if(mode==='scan')closeScan(true);hiddenAt=Date.now();if(STT.state==='rec')sttStop(false);if(STT.stream){STT.stream.getTracks().forEach(t=>t.stop());STT.stream=null;clearInterval(STT.timer);try{STT.ctx.close()}catch(e){}STT.ctx=null;STT.state='idle'}micWasOn=micOn;micOn=false;recPause();setConvo();try{speechSynthesis.cancel()}catch(e){}speaking=false;
   if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null}camOn=false;const v=$('cam');v.srcObject=null;const st=$('camst');st.hidden=false;st.textContent='Caméra en pause'}
 function wakeAll(){startCam();if(Date.now()-hiddenAt>30000){faceGate();return}if(micWasOn||!userMicOff){micOn=true;setConvo();setTimeout(recStart,600)}}
 document.addEventListener('visibilitychange',()=>{document.hidden?sleepAll():wakeAll()});
