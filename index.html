@@ -409,7 +409,6 @@ const WAKE=/\b(ultron|ultrons|ultra|ultrone|hultron|ul tron|eltron|altron|oultro
 const attentive=()=>performance.now()<attentiveUntil;
 function hear(raw){const plain=raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');act();
   if(standby){if(WAKE.test(plain)){const rest=raw.replace(/\b(hey|eh|ok|dis|salut|bonjour)?\s*(ultron|ultrons|ultra|ultrone|hultron|ul tron|eltron|altron|oultron|ultrom)\b[\s,.!?]*/i,' ').trim();wakeUp(rest.replace(/[^a-zà-ÿ0-9]/gi,'').length>=2?rest:'')}return}
-  if(/ (mode veille|mets toi en veille|va dormir|en veille) /.test(' '+plain.replace(/[^a-z0-9]+/g,' ')+' ')&&mode==='idle'){say("Mise en veille, Monsieur. Dites mon nom pour me réveiller.");setTimeout(enterStandby,2600);return}
   if(WAKE.test(plain)){const rest=raw.replace(/\b(hey|eh|ok|dis|salut|bonjour)?\s*(ultron|ultrons|ultra|ultrone|hultron|ul tron|eltron|altron|oultron|ultrom)\b[\s,.!?]*/i,' ').trim();
     attentiveUntil=performance.now()+12000;ignite();if(rest.replace(/[^a-zà-ÿ0-9]/gi,'').length<2){say(["Oui, Monsieur ?","Je vous écoute, Monsieur.","À votre service, Monsieur."][Math.floor(Math.random()*3)]);return}handle(rest);return}
   handle(raw)}
@@ -1082,7 +1081,7 @@ sres.addEventListener('pointerdown',e=>e.stopPropagation());
 // ───────── réveil par la voix : veille (écran noir), « Ultron » rallume l'orbe avec un son grave
 const sbEl=$('standby'),ember=$('ember'),EX=ember.getContext('2d');let standby=false,lastAct=performance.now(),wakeLock=null,AC2=null;
 function act(){lastAct=performance.now()}
-async function keepAwake(){try{if('wakeLock'in navigator&&!document.hidden&&!wakeLock){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null})}}catch(e){}}
+async function keepAwake(){return;try{if('wakeLock'in navigator&&!document.hidden&&!wakeLock){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null})}}catch(e){}}
 function audio(){if(!AC2){const A=window.AudioContext||window.webkitAudioContext;if(!A)return null;AC2=new A()}if(AC2.state!=='running')AC2.resume().catch(()=>{});return AC2}
 function boom(){const c=audio();if(!c)return;const t=c.currentTime,out=c.createGain();out.gain.value=.9;
   // réverbération synthétique
@@ -1097,8 +1096,8 @@ function boom(){const c=audio();if(!c)return;const t=c.currentTime,out=c.createG
   const o3=c.createOscillator(),f3=c.createBiquadFilter(),g3=c.createGain();o3.type='sawtooth';o3.frequency.setValueAtTime(82,t);o3.frequency.linearRampToValueAtTime(73,t+2);f3.type='lowpass';f3.frequency.setValueAtTime(900,t);f3.frequency.exponentialRampToValueAtTime(120,t+2);f3.Q.value=6;env(g3,.08,.16,1.9);o3.connect(f3);f3.connect(g3);g3.connect(out);o3.start(t);o3.stop(t+2.3);
   // souffle
   const nb=c.createBuffer(1,c.sampleRate,c.sampleRate),nd=nb.getChannelData(0);for(let i=0;i<nd.length;i++)nd[i]=Math.random()*2-1;const ns=c.createBufferSource(),fn=c.createBiquadFilter(),gn=c.createGain();ns.buffer=nb;fn.type='bandpass';fn.frequency.setValueAtTime(2200,t);fn.frequency.exponentialRampToValueAtTime(300,t+.8);env(gn,.02,.12,.8);ns.connect(fn);fn.connect(gn);gn.connect(out);ns.start(t)}
-function ignite(){boom();app.classList.remove('ignite');void app.offsetWidth;app.classList.add('ignite');const p=orbPos(),f=document.createElement('div');f.className='flash';f.style.setProperty('--fx',p.x+'px');f.style.setProperty('--fy',p.y+'px');app.appendChild(f);setTimeout(()=>f.remove(),1500);orbPulse(1.4);setTimeout(()=>orbPulse(1),260)}
-function enterStandby(){if(standby||locked||mode!=='idle')return;standby=true;sbEl.hidden=false;requestAnimationFrame(()=>sbEl.classList.add('on'));
+function ignite(){return;boom();app.classList.remove('ignite');void app.offsetWidth;app.classList.add('ignite');const p=orbPos(),f=document.createElement('div');f.className='flash';f.style.setProperty('--fx',p.x+'px');f.style.setProperty('--fy',p.y+'px');app.appendChild(f);setTimeout(()=>f.remove(),1500);orbPulse(1.4);setTimeout(()=>orbPulse(1),260)}
+function enterStandby(){return;if(standby||locked||mode!=='idle')return;standby=true;sbEl.hidden=false;requestAnimationFrame(()=>sbEl.classList.add('on'));
   // économie : caméra coupée pendant la veille, le micro reste à l'écoute du mot « Ultron »
   if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;camOn=false}keepAwake();emberLoop()}
 function wakeUp(rest){if(!standby)return;standby=false;sbEl.classList.remove('on');setTimeout(()=>{if(!standby)sbEl.hidden=true},1200);act();ignite();startCam();
@@ -1107,8 +1106,6 @@ function emberLoop(){if(!standby)return;const d=Math.min(2,devicePixelRatio||1),
   EX.clearRect(0,0,S,S);const g=EX.createRadialGradient(c,c,0,c,c,S/2);g.addColorStop(0,`rgba(255,30,45,${.16+b*.12})`);g.addColorStop(.25,`rgba(160,0,20,${.08+b*.05})`);g.addColorStop(1,'rgba(0,0,0,0)');EX.fillStyle=g;EX.fillRect(0,0,S,S);
   EX.fillStyle=`rgba(255,60,70,${.35+b*.3})`;EX.beginPath();EX.arc(c,c,3*d,0,7);EX.fill();requestAnimationFrame(emberLoop)}
 sbEl.addEventListener('pointerdown',e=>{e.stopPropagation();audio();wakeUp()});
-// mise en veille automatique après 2 minutes sans activité sur l'écran principal
-setInterval(()=>{if(started&&!locked&&!standby&&mode==='idle'&&!speaking&&!thinking&&performance.now()-lastAct>120000)enterStandby()},5000);
 ['pointerdown','touchstart','keydown'].forEach(ev=>addEventListener(ev,()=>{act();audio()},{passive:true,capture:true}));
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)keepAwake()});
 
