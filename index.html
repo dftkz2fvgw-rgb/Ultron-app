@@ -225,6 +225,8 @@ body:has(.night.on) .fx{opacity:0}
     <h3>CLÉS D'ULTRON</h3>
     <p><b>Écoute</b> : clé Groq gratuite (console.groq.com → API Keys, elle commence par gsk_). Une clé OpenAI marche aussi.</p>
     <input id="sttin" type="password" placeholder="gsk_…" autocomplete="off">
+    <p><b>Scanner</b> : clé Google Gemini gratuite (aistudio.google.com → Get API key, elle commence par AIza).</p>
+    <input id="gemin" type="password" placeholder="AIza…" autocomplete="off">
     <p><b>Conversation</b> : clé Claude (commence par sk-ant-).</p>
     <input id="keyin" type="password" placeholder="sk-ant-…" autocomplete="off">
     <p>Elles restent uniquement sur ce téléphone.</p>
@@ -356,10 +358,12 @@ function micToggle(){if(!SR&&!sttKey()){askKey();return}if(false){say("La reconn
   if(needTap){needTap=false;micOn=true;setConvo();recStart();return}micOn=!micOn;userMicOff=!micOn;setConvo();if(micOn)recStart();else recPause()}
 function findKey(){try{const k=localStorage.getItem('ultron_key');if(k)return k.trim();if(localStorage.getItem('ultron_key_bad'))return null;for(let i=0;i<localStorage.length;i++){const v=localStorage.getItem(localStorage.key(i))||'';const m=v.match(/sk-ant-[A-Za-z0-9_\-]{20,}/);if(m)return m[0]}}catch(e){}return null}
 const modal=$('modal'),keyin=$('keyin'),sttin=$('sttin');
-function askKey(){modal.hidden=false;keyin.value='';sttin.value='';sttin.placeholder=sttKey()?'••••  enregistrée':'gsk_…';keyin.placeholder=findKey()?'••••  enregistrée':'sk-ant-…';setTimeout(()=>(sttKey()?keyin:sttin).focus(),50)}
+function gemKey(){try{return localStorage.getItem('ultron_gemini')}catch(e){return null}}
+function askKey(){modal.hidden=false;keyin.value='';sttin.value='';$('gemin').value='';$('gemin').placeholder=gemKey()?'••••  enregistrée':'AIza…';sttin.placeholder=sttKey()?'••••  enregistrée':'gsk_…';keyin.placeholder=findKey()?'••••  enregistrée':'sk-ant-…';setTimeout(()=>(sttKey()?keyin:sttin).focus(),50)}
 $('hlp').onclick=e=>{e.stopPropagation();switchHolo(-1)};$('hln').onclick=e=>{e.stopPropagation();switchHolo(1)};
 $('kno').onclick=()=>{modal.hidden=true};
-$('kok').onclick=()=>{try{localStorage.removeItem('ultron_key_bad')}catch(e){}goodModel=null;const v=keyin.value.trim(),w=sttin.value.trim();let bad=false;
+$('kok').onclick=()=>{try{localStorage.removeItem('ultron_key_bad')}catch(e){}goodModel=null;const v=keyin.value.trim(),w=sttin.value.trim(),gm=$('gemin').value.trim();let bad=false;
+  if(gm){if(/^AIza[\w-]{20,}$/.test(gm)){try{localStorage.setItem('ultron_gemini',gm)}catch(e){}gemModel=null}else{$('gemin').style.borderColor='var(--red)';bad=true}}
   if(w){if(/^(gsk_|sk-)/.test(w)&&!/^sk-ant-/.test(w)){try{localStorage.setItem('ultron_stt',w)}catch(e){}}else{sttin.style.borderColor='var(--red)';bad=true}}
   if(v){if(/^sk-ant-/.test(v)){try{localStorage.setItem('ultron_key',v)}catch(e){}}else{keyin.style.borderColor='var(--red)';bad=true}}
   if(bad)return;modal.hidden=true;micOn=true;needTap=false;setConvo();recStart();say("Clés enregistrées. Je vous écoute, Monsieur.")};
@@ -965,13 +969,13 @@ function scanStart(msg){scanBusy=true;sres.hidden=true;$('shint').hidden=true;sc
 function scanFail(m){$('sstate').textContent='ÉCHEC';showHeard('⚠ Scanner : '+m,true);say("Je n'ai pas pu identifier cela, Monsieur. Rapprochez-vous et réessayez.");frz.hidden=true;scanV.hidden=false;$('shint').hidden=false}
 function scanEnd(){scanBusy=false;scanEl.classList.remove('busy');scanDots(false)}
 // ── 1) codes-barres (ZXing) → Open Food Facts
-let ZX=null;
+let ZX=null,scanTipDone=false;
 async function zx(){if(ZX)return ZX;await loadJS('https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js');const h=new Map();h.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.EAN_13,ZXing.BarcodeFormat.EAN_8,ZXing.BarcodeFormat.UPC_A,ZXing.BarcodeFormat.UPC_E,ZXing.BarcodeFormat.QR_CODE]);h.set(ZXing.DecodeHintType.TRY_HARDER,true);const r=new ZXing.MultiFormatReader();r.setHints(h);ZX=r;return r}
 function readCode(src,w,h){if(!ZX)return null;const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d',{willReadFrequently:true});g.drawImage(src,0,0,w,h);const d=g.getImageData(0,0,w,h).data,L=new Uint8ClampedArray(w*h);
   for(let i=0,j=0;j<L.length;i+=4,j++)L[j]=(d[i]*306+d[i+1]*601+d[i+2]*117)>>10;
   try{return ZX.decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.RGBLuminanceSource(L,w,h)))).getText()}catch(e){return null}finally{ZX.reset()}}
 // détection continue d'un code-barres pendant que le scanner vise
-let codeLoop=null;function startCodeLoop(){clearInterval(codeLoop);zx().catch(()=>{});codeLoop=setInterval(()=>{if(mode!=='scan'||scanBusy||!sres.hidden||scanV.readyState<2||!ZX)return;const vw=scanV.videoWidth,vh=scanV.videoHeight,k=Math.min(1,900/Math.max(vw,vh));const code=readCode(scanV,Math.round(vw*k),Math.round(vh*k));if(code)scanCode(code)},450)}
+let codeLoop=null;function startCodeLoop(){clearInterval(codeLoop);zx().catch(()=>{});codeLoop=setInterval(()=>{if(mode!=='scan'||scanBusy||!sres.hidden||scanV.readyState<2||!ZX)return;const vw=scanV.videoWidth,vh=scanV.videoHeight,k=Math.min(1,900/Math.max(vw,vh));let code=readCode(scanV,Math.round(vw*k),Math.round(vh*k));if(!code){const c=document.createElement('canvas'),cw=vw*.6,ch=vh*.4;c.width=Math.round(cw*Math.min(1.6,1000/cw));c.height=Math.round(ch*c.width/cw);c.getContext('2d').drawImage(scanV,(vw-cw)/2,(vh-ch)/2,cw,ch,0,0,c.width,c.height);code=readCode(c,c.width,c.height)}if(code)scanCode(code)},350)}
 async function scanCode(code){if(scanBusy)return;freezeFrame();scanStart('CODE '+code);say("Code-barres détecté, Monsieur.");
   try{if(!/^\d{8,14}$/.test(code)){showScan({type:'texte',nom:'QR code',resume:code,details:[['Contenu',code.length>40?code.slice(0,40)+'…':code]],liste_titre:'',liste:[],vocal:"QR code lu, Monsieur. Le contenu est affiché.",link:/^https?:/.test(code)?code:''});return}
     const r=await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?lc=fr&fields=product_name_fr,product_name,brands,quantity,nutriments,ingredients_text_fr,ingredients_text,nutriscore_grade,nova_group,image_front_small_url,serving_size,allergens_tags,labels`);
@@ -989,7 +993,29 @@ const FOOD={'pizza':['Pizza',800,['Pâte','Sauce tomate','Mozzarella','Huile d\'
 const PLANTS=new Set(['daisy','yellow lady\'s slipper','pot','flowerpot','acorn','hip','buckeye','rapeseed','coral fungus','agaric','gyromitra','stinkhorn','earthstar','hen-of-the-woods','bolete']);
 async function wikiFr(term){try{const r=await fetch('https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=langlinks&lllang=fr&redirects=1&titles='+encodeURIComponent(term));const j=await r.json(),pg=Object.values(j.query.pages)[0];const fr=pg.langlinks&&pg.langlinks[0]&&pg.langlinks[0]['*'];
     const r2=await fetch(fr?'https://fr.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(fr.replace(/ /g,'_')):'https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(term.replace(/ /g,'_')));const d=await r2.json();return{title:fr||d.title||term,extract:d.extract||'',img:d.thumbnail&&d.thumbnail.source}}catch(e){return{title:term,extract:''}}}
-async function scanLocal(){$('sstate').textContent='RECONNAISSANCE…';const m=await mobilenetModel(),preds=await m.classify(frz,3);if(!preds.length)throw new Error('rien reconnu');
+
+// ── IA de vision gratuites : Google Gemini (recommandé) ou Groq
+let gemModel=null,groqVis=null;
+const parseJSON=txt=>{const a=txt.indexOf('{'),b=txt.lastIndexOf('}');if(a<0||b<a)throw new Error('réponse illisible');return JSON.parse(txt.slice(a,b+1))};
+async function scanGemini(){const key=gemKey();if(!key)throw new Error('pas de clé Gemini');const data=frz.toDataURL('image/jpeg',.85).split(',')[1];
+  if(!gemModel){const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key='+key);if(r.status===400||r.status===403){try{localStorage.removeItem('ultron_gemini')}catch(e){}throw new Error('clé Gemini refusée')}
+    const j=await r.json(),ms=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes('generateContent')&&/gemini/.test(m.name)&&/flash/.test(m.name)&&!/(image|tts|audio|live|thinking-exp|embedding)/.test(m.name));
+    const v=n=>{const m=n.match(/gemini-(\d+(?:\.\d+)?)/);return m?parseFloat(m[1]):0};ms.sort((a,b)=>v(b.name)-v(a.name)||(/lite/.test(a.name)-/lite/.test(b.name))||(/preview|exp/.test(a.name)-/preview|exp/.test(b.name)));
+    gemModel=(ms[0]&&ms[0].name)||'models/gemini-2.5-flash'}
+  const call=async withSearch=>{const body={contents:[{parts:[{inline_data:{mime_type:'image/jpeg',data}},{text:SCAN_PROMPT}]}],generationConfig:{temperature:.2}};if(withSearch)body.tools=[{google_search:{}}];
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/${gemModel}:generateContent?key=${key}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw Object.assign(new Error((e.error&&e.error.message)||('erreur '+r.status)),{status:r.status})}
+    const j=await r.json();return parseJSON(((j.candidates||[])[0]?.content?.parts||[]).map(p=>p.text||'').join(''))};
+  try{return await call(true)}catch(e){if(e.status===429)throw new Error('quota Gemini atteint pour aujourd\'hui');return await call(false)}}
+async function scanGroq(){const key=sttKey();if(!key||!key.startsWith('gsk_'))throw new Error('pas de clé Groq');const url='data:image/jpeg;base64,'+frz.toDataURL('image/jpeg',.8).split(',')[1];
+  if(!groqVis){const r=await fetch('https://api.groq.com/openai/v1/models',{headers:{Authorization:'Bearer '+key}});const j=await r.json();const ids=(j.data||[]).map(m=>m.id);
+    groqVis=ids.find(i=>/maverick/.test(i))||ids.find(i=>/scout/.test(i))||ids.find(i=>/vision|llama-4|vl/.test(i));if(!groqVis)throw new Error('aucun modèle de vision Groq')}
+  const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+key},body:JSON.stringify({model:groqVis,temperature:.2,max_tokens:1400,response_format:{type:'json_object'},messages:[{role:'user',content:[{type:'text',text:SCAN_PROMPT},{type:'image_url',image_url:{url}}]}]})});
+  if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error((e.error&&e.error.message)||('erreur '+r.status))}const j=await r.json();return parseJSON(j.choices[0].message.content||'')}
+async function scanLocal(){$('sstate').textContent='RECONNAISSANCE…';const m=await mobilenetModel(),agg={};
+  for(const[z,w]of[[1,1],[.72,1.3],[.5,1.1]]){const c=document.createElement('canvas'),S=Math.min(frz.width,frz.height)*z;c.width=c.height=299;c.getContext('2d').drawImage(frz,(frz.width-S)/2,(frz.height-S)/2,S,S,0,0,299,299);
+    for(const q of await m.classify(c,5)){agg[q.className]=(agg[q.className]||0)+q.probability*w}}
+  const preds=Object.entries(agg).map(([className,p])=>({className,probability:p/3.4})).sort((a,b)=>b.probability-a.probability).slice(0,3);if(!preds.length)throw new Error('rien reconnu');
   const top=preds[0],term=top.className.split(',')[0].trim(),conf=Math.round(top.probability*100);
   if(conf<18)return await scanOcr(true)||{type:'autre',nom:'Élément non identifié',resume:'Je ne reconnais pas cet élément avec certitude. Rapprochez-vous, éclairez mieux, ou visez un code-barres.',details:preds.map(p=>[p.className.split(',')[0],Math.round(p.probability*100)+' %']),liste:[],vocal:"Je ne suis pas certain de ce que je vois, Monsieur."};
   const F=FOOD[term];if(F&&F[1]){const[nom,kcal,ing,[pr,gl,li,fi],por]=F;return{type:'plat',nom,resume:`Reconnu à ${conf} %. Valeurs moyennes estimées pour une portion type.`,details:[['Calories',`≈ ${kcal} kcal`],['Portion',por],['Protéines',pr+' g'],['Glucides',gl+' g'],['Lipides',li+' g'],['Fibres',fi+' g']],liste_titre:'Ingrédients habituels',liste:ing,vocal:`${nom}, Monsieur. Environ ${kcal} calories pour ${por.replace(/\(.*\)/,'').trim()}.`}}
@@ -1009,11 +1035,11 @@ async function scanShot(ocrOnly){if(scanBusy||!scanStream||scanV.readyState<2)re
   try{if(!ocrOnly){await zx().catch(()=>{});const code=readCode(frz,frz.width,frz.height);if(code){scanEnd();scanBusy=false;frz.hidden=true;scanV.hidden=false;return scanCode(code)}}
     let o=null;
     if(ocrOnly)o=await scanOcr();
-    else if(findKey()){try{o=await scanClaude()}catch(e){showHeard('⚠ Claude indisponible, analyse sur l\'appareil',false)}}
-    if(!o)o=await scanLocal();showScan(o)}
+    else{const tries=[[gemKey(),'Gemini',scanGemini],[(sttKey()||'').startsWith('gsk_'),'Groq',scanGroq],[findKey(),'Claude',scanClaude]];
+      for(const[ok,name,fn]of tries){if(!ok||o)continue;$('sstate').textContent='ANALYSE '+name.toUpperCase()+'…';try{o=await fn();o.via=name}catch(e){showHeard('⚠ '+name+' : '+e.message,false)}}}
+    if(!o){o=await scanLocal();o.via='appareil';if(!gemKey()&&!scanTipDone){scanTipDone=true;setTimeout(()=>say("Pour une reconnaissance précise des marques et des prix, ajoutez une clé Gemini gratuite, Monsieur."),2600)}}showScan(o)}
   catch(e){scanFail(e.message)}finally{scanEnd()}}
-async function scanClaude(){const key=findKey();const data=frz.toDataURL('image/jpeg',.82).split(',')[1];
-  const prompt=`Tu es le scanner d'ULTRON. Identifie ce que montre la photo et réponds UNIQUEMENT par un objet JSON (sans texte autour) :
+const SCAN_PROMPT=`Tu es le scanner d'ULTRON. Identifie ce que montre la photo et réponds UNIQUEMENT par un objet JSON (sans texte autour) :
 {"type":"plat|objet|plante|texte|animal|lieu|autre","nom":"nom précis","resume":"une ou deux phrases","details":[["Libellé","valeur"],…],"liste_titre":"titre de la liste","liste":["…"],"vocal":"une phrase courte à dire à voix haute, en vouvoyant Monsieur"}
 Selon le type :
 - plat/aliment : estime la portion visible ; details = Calories (kcal), Protéines, Glucides, Lipides, Fibres, Portion ; liste = ingrédients probables.
@@ -1021,13 +1047,15 @@ Selon le type :
 - plante : details = Nom latin, Arrosage, Lumière, Toxicité (animaux), Difficulté ; liste = conseils d'entretien.
 - animal : details = Espèce, Taille adulte, Espérance de vie, Comportement ; liste = faits notables.
 - texte : resume = transcription exacte du texte ; details = Langue, Type de document ; liste = traduction en français si le texte n'est pas en français, sinon les points clés.
-Tout en français. Si l'image est floue ou vide, type "autre" et explique quoi viser.`;
+Sois précis : lis les marques, logos et textes visibles sur l'objet pour identifier le modèle exact. Tout en français. Si l'image est floue ou vide, type "autre" et explique quoi viser.`;
+async function scanClaude(){const key=findKey();const data=frz.toDataURL('image/jpeg',.82).split(',')[1];
+  const prompt=SCAN_PROMPT;
   const body={max_tokens:1500,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data}},{type:'text',text:prompt}]}],tools:[{type:'web_search_20250305',name:'web_search',max_uses:2}]};
   let r;for(const m of(goodModel?[goodModel]:['claude-sonnet-5-5','claude-haiku-5-5','claude-sonnet-4-5'])){body.model=m;r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify(body)});if(r.ok)break;if(r.status!==404&&r.status!==400)break}
     if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error((e.error&&e.error.message)||('erreur '+r.status))}
     const j=await r.json(),txt=(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');return JSON.parse(txt.slice(txt.indexOf('{'),txt.lastIndexOf('}')+1))}
 const SLAB={plat:'Plat · nutrition',objet:'Objet · produit',plante:'Plante',texte:'Texte',animal:'Animal',lieu:'Lieu',autre:'Analyse'};
-function showScan(o){lastScan=o;$('sstate').textContent='IDENTIFIÉ';$('sk').textContent=SLAB[o.type]||'Analyse';$('sn').textContent=o.nom||'—';$('ss').textContent=o.resume||'';
+function showScan(o){lastScan=o;$('sstate').textContent='IDENTIFIÉ';$('sk').textContent=(SLAB[o.type]||'Analyse')+(o.via?' · '+o.via:'');$('sn').textContent=o.nom||'—';$('ss').textContent=o.resume||'';
   const old=sres.querySelector('.simg');if(old)old.remove();if(o.img){const im=document.createElement('img');im.className='simg';im.alt='';im.src=o.img;sres.insertBefore(im,sres.firstChild)}
   const pr=$('sprice'),q=o.price||(o.type==='objet'?o.nom:'');if(q){pr.href='https://www.google.com/search?tbm=shop&q='+encodeURIComponent(q);pr.hidden=false}else if(o.link){pr.href=o.link;pr.textContent='Ouvrir le lien ›';pr.hidden=false}else pr.hidden=true;if(q)pr.textContent='Voir les prix ›';
   const rows=$('srows');rows.innerHTML='';(o.details||[]).slice(0,8).forEach(([k,v])=>{const d=document.createElement('div'),a=document.createElement('span'),b=document.createElement('b');a.textContent=k;b.textContent=v;d.append(a,b);rows.appendChild(d)});
