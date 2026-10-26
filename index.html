@@ -66,6 +66,9 @@ html,body{height:100%;margin:0;background:var(--void);color:var(--ink);font-fami
 .card .b{padding:12px 14px 14px;display:flex;flex-direction:column;gap:3px}
 .card .k{font-size:9px;letter-spacing:.22em;color:var(--red);text-transform:uppercase}
 .card h2{margin:0;font:600 22px var(--display);letter-spacing:.04em}
+.card a{pointer-events:auto;align-self:flex-start;margin-top:6px;font:500 11px var(--mono);letter-spacing:.08em;color:var(--red);text-decoration:none;border:1px solid rgba(255,42,61,.4);border-radius:9px;padding:6px 10px}
+.card a[hidden]{display:none}
+.lbl.nw{color:#ff5a68;font-weight:500;text-transform:none;letter-spacing:.02em;max-width:170px;overflow:hidden;text-overflow:ellipsis}
 .card p{margin:6px 0 0;font:400 12px/1.55 var(--mono);color:#c9ced8;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
 .modal{position:absolute;inset:0;z-index:9;display:grid;place-items:center;background:rgba(0,0,0,.6);padding:16px}
 .modal[hidden]{display:none}
@@ -169,7 +172,7 @@ body:has(.night.on) .fx{opacity:0}
     <div class="lk-ring"><canvas id="lockcv"></canvas><i></i></div>
     <p id="lockst">Activation…</p><button id="lockbtn" hidden>Réessayer</button>
   </div></div>
-  <div class="card" id="card"><img id="cimg" alt="" hidden><div class="b"><span class="k" id="ck"></span><h2 id="cn"></h2><p id="cd"></p></div></div>
+  <div class="card" id="card"><img id="cimg" alt="" hidden><div class="b"><span class="k" id="ck"></span><h2 id="cn"></h2><p id="cd"></p><a id="clink" target="_blank" rel="noopener" hidden>Lire l'article ›</a></div></div>
   <div class="modal" id="modal" hidden><div class="in">
     <h3>CLÉS D'ULTRON</h3>
     <p><b>Écoute</b> : clé Groq gratuite (console.groq.com → API Keys, elle commence par gsk_). Une clé OpenAI marche aussi.</p>
@@ -350,6 +353,11 @@ function hear(raw){const plain=raw.toLowerCase().normalize('NFD').replace(/[\u03
   handle(raw)}
 function handle(raw){const t=norm(raw);if(!t.trim())return;attentiveUntil=performance.now()+15000;
   if(journalOpen){journalCmd(raw,t);return}
+  if(/ (actu|actus|actualite|actualites|infos?|nouvelles|news) /.test(t)&&!/ (ferme|cache|enleve|retire)/.test(t)&&!/ (suivante?|precedente?)/.test(t)){openNews(/ (rafraichis|mets? a jour|actualise|recharge)/.test(t));if(!newsCache())say("Je collecte les informations du jour, Monsieur.");return}
+  if(/ (ferme|cache|enleve|retire) (les )?(actu|actus|actualites|infos)/.test(t)){closeNews();return say("Actualités masquées, Monsieur.")}
+  if(newsOn&&/ (suivante?|prochaine|apres) /.test(t)){stepNews(1);return}
+  if(newsOn&&/ (precedente?|avant) /.test(t)){stepNews(-1);return}
+  if(newsOn&&/ (lis|resume|raconte|detail)/.test(t)&&newsSel){say(newsSel.title+'. '+newsSel.sum);return}
   if(/ (ouvre|affiche|lance|montre)( moi)? (le |mon |un )?journal /.test(t)||/^ journal $/.test(t)){openJournal();return say("Journal ouvert, Monsieur. Je vous écoute, dictez.")}
   if(/ (ecris|note|ajoute|inscris) (dans|sur) (le |mon )?journal/.test(t)){const txt=raw.replace(/^.*?journal\s*(que|:)?\s*/i,'');if(txt.trim()){jWrite(txt);say("C'est noté dans votre journal, Monsieur.")}else{openJournal();say("Journal ouvert, Monsieur. Je vous écoute.")}return}
   if(/ (ferme|cache|quitte|enleve|retire|desactive|eteins)/.test(t)&&/ (carte|globe|monde|terre|corps|hologramme|tout|ca|la) /.test(t)){
@@ -444,7 +452,7 @@ const dDef=()=>1/Math.sin(Math.atan(Math.tan(20*R)*(W/H)*.9));const D_MIN=1.12;
 function resetView(){tv.lon=2;tv.lat=22;z=0;lastInput=performance.now();hideCard()}
 function goCap(c){if(mode!=='map')openMap();tv.lon=c.lo;tv.lat=c.la;z=.92;lastInput=performance.now()}
 async function openMap(){if(mode==='map')return;if(journalOpen){journalOpen=false;jEl.classList.remove('show');jEl.hidden=true;mode='idle'}if(mode==='body')instantCloseBody();if(!await initGlobe())return;const p=orbPos();mode='map';resetView();view.lon=tv.lon;view.lat=tv.lat;zEff=0;reveal={t0:performance.now(),d:reduce?1:1500,x:p.x,y:p.y,dir:1};place();HG.pd=0}
-function closeMap(){if(mode!=='map')return;closeStreet();hideCard();const p=orbPos();reveal={t0:performance.now(),d:reduce?1:900,x:p.x,y:p.y,dir:-1};mode='closing'}
+function closeMap(){if(mode!=='map')return;closeStreet();closeNews();hideCard();const p=orbPos();reveal={t0:performance.now(),d:reduce?1:900,x:p.x,y:p.y,dir:-1};mode='closing'}
 function renderGlobe(t){if(!G)return;
   if(reveal){const k=Math.min(1,(t-reveal.t0)/reveal.d),e=reveal.dir>0?1-Math.pow(1-k,3):1-k*k*k,r=e*Math.hypot(W,H);globeEl.style.clipPath=`circle(${r}px at ${reveal.x}px ${reveal.y}px)`;
     if(k>=1){if(reveal.dir<0){mode='idle';place();labelsEl.querySelectorAll('.lbl').forEach(l=>l.hidden=true)}else globeEl.style.clipPath='none';reveal=null}}
@@ -461,6 +469,9 @@ function renderGlobe(t){if(!G)return;
   const showL=zEff>.3;G.group.updateMatrixWorld();const w=new T.Vector3();
   for(const c of CAPS){if(!showL){c.el.hidden=true;continue}w.copy(c.v).applyMatrix4(G.group.matrixWorld);const facing=w.z>.25;if(!facing){c.el.hidden=true;continue}
     w.project(G.camera);const sx=(w.x+1)/2*W,sy=(1-w.y)/2*H;if(sx<-40||sx>W+40||sy<-20||sy>H+20){c.el.hidden=true;continue}c.el.hidden=false;c.el.style.transform=`translate(${sx+7}px,${sy-6}px)`}
+  newsFrame(t);
+  if(newsSel)return;
+  if(newsOn&&mode==='map'&&zEff>.6){for(const n of NEWS)if(angDist(view.lat,view.lon,n.la,n.lo)<3){showNews(n);return}}
   // fiche de la capitale quand on est tout près
   if(mode==='map'&&zEff>.8){let best=null,bd=1e9;for(const c of CAPS){const d=angDist(view.lat,view.lon,c.la,c.lo);if(d<bd){bd=d;best=c}}if(bd<5)showCard(best);else if(bd>9)hideCard()}else if(zEff<.7)hideCard()}
 
@@ -471,7 +482,7 @@ async function showCard(c){if(cardCap===c)return;cardCap=c;$('ck').textContent='
     if(cardCap!==c)return;const d=wiki[c.n];$('cd').textContent=d.extract||'Aucune description disponible.';
     const src=(d.originalimage&&d.originalimage.width<2600?d.originalimage.source:d.thumbnail&&d.thumbnail.source)||'';if(src){cimg.onload=()=>{if(cardCap===c)cimg.hidden=false};cimg.src=src}}
   catch(e){if(cardCap===c)$('cd').textContent='Description indisponible hors connexion.'}}
-function hideCard(){if(!cardCap)return;cardCap=null;card.classList.remove('show')}
+function hideCard(){if(newsSel)return;if(!cardCap)return;cardCap=null;card.classList.remove('show')}
 
 // ───────── gestes de la main (caméra)
 // ✋ paume ouverte qui bouge : rotation · 🤏 pouce + index (autres doigts pliés) : écarter = agrandir, rapprocher = rétrécir
@@ -803,6 +814,51 @@ function journalCmd(raw,t){
   // tout le reste est dicté dans le journal
   const txt=raw.replace(/^\s*(ultron[, ]*)?(ecris|écris|note|notes|ajoute|marque|inscris)( (dans|sur) (le |mon )?journal)?( que| :)?\s*/i,'');jWrite(txt);return true}
 
+
+// ───────── actus mondiales : points rouges sur le globe
+const NKEY='ultron_news';let NEWS=[],newsGrp=null,newsOn=false,newsSel=null,newsLoading=false;
+const EN2FR={'United States':'États-Unis','United Kingdom':'Royaume-Uni','France':'France','Germany':'Allemagne','Spain':'Espagne','Italy':'Italie','Russia':'Russie','China':'Chine','Japan':'Japon','India':'Inde','Brazil':'Brésil','Canada':'Canada','Australia':'Australie','Mexico':'Mexique','Turkey':'Turquie','Egypt':'Égypte','Nigeria':'Nigeria','South Africa':'Afrique du Sud','Kenya':'Kenya','Argentina':'Argentine','Israel':'Israël','Iran':'Iran','Pakistan':'Pakistan','Ukraine':'Ukraine','Poland':'Pologne','South Korea':'Corée du Sud','Indonesia':'Indonésie','Philippines':'Philippines','Saudi Arabia':'Arabie saoudite','Qatar':'Qatar','United Arab Emirates':'Émirats arabes unis','Ireland':'Irlande','Belgium':'Belgique','Netherlands':'Pays-Bas','Switzerland':'Suisse','Sweden':'Suède','Norway':'Norvège','Greece':'Grèce','Portugal':'Portugal','Morocco':'Maroc','Algeria':'Algérie','Singapore':'Singapour','Malaysia':'Malaisie','Thailand':'Thaïlande','Vietnam':'Viêt Nam','New Zealand':'Nouvelle-Zélande','Colombia':'Colombie','Chile':'Chili','Peru':'Pérou','Lebanon':'Liban','Bangladesh':'Bangladesh','Ethiopia':'Éthiopie','Ghana':'Ghana','Senegal':'Sénégal','Austria':'Autriche','Hungary':'Hongrie','Czech Republic':'Tchéquie','Denmark':'Danemark','Finland':'Finlande','Tunisia':'Tunisie','Iraq':'Irak','Jordan':'Jordanie','Venezuela':'Venezuela','Cuba':'Cuba'};
+function newsCache(){try{const c=JSON.parse(localStorage.getItem(NKEY));if(c&&Date.now()-c.t<3*3600e3&&c.items&&c.items.length)return c.items}catch(e){}return null}
+async function newsFromClaude(){const key=findKey();if(!key)throw new Error('nokey');const today=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const prompt=`Nous sommes le ${today}. Fais des recherches sur le web et donne l'actualité la plus importante d'aujourd'hui (ou d'hier) dans 20 pays différents répartis sur tous les continents, dont la France. Réponds UNIQUEMENT avec un tableau JSON, sans aucun texte autour, de la forme : [{"pays":"Japon","lat":35.68,"lon":139.69,"titre":"titre court en français","resume":"deux phrases en français","source":"https://…"}]. lat/lon = la ville concernée par l'info (ou la capitale).`;
+  const body={model:goodModel||'claude-sonnet-5-5',max_tokens:6000,tools:[{type:'web_search_20250305',name:'web_search',max_uses:6}],messages:[{role:'user',content:prompt}]};
+  let r;for(const m of(goodModel?[goodModel]:['claude-sonnet-5-5','claude-haiku-5-5','claude-sonnet-4-5'])){body.model=m;r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify(body)});if(r.ok)break;if(r.status!==404&&r.status!==400)break}
+  if(!r.ok)throw new Error('claude '+r.status);const j=await r.json(),txt=(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+  const a=txt.indexOf('['),b=txt.lastIndexOf(']');const arr=JSON.parse(txt.slice(a,b+1));
+  return arr.filter(x=>x&&isFinite(x.lat)&&isFinite(x.lon)&&x.titre).map(x=>({c:x.pays||'',la:+x.lat,lo:+x.lon,title:x.titre,sum:x.resume||'',url:x.source||''}))}
+async function newsFromGdelt(){const r=await fetch('https://api.gdeltproject.org/api/v2/doc/doc?query=%28world%20OR%20government%20OR%20president%29%20sourcelang:english&mode=artlist&maxrecords=250&timespan=24h&sort=hybridrel&format=json');
+  const j=await r.json(),seen={},out=[];for(const a of(j.articles||[])){const fr=EN2FR[a.sourcecountry];if(!fr||seen[fr])continue;const cap=CAPS.find(c=>c.c===fr);if(!cap)continue;seen[fr]=1;
+    out.push({c:fr,la:cap.la,lo:cap.lo,title:a.title,sum:'Source : '+a.domain+' (article en anglais).',url:a.url,img:a.socialimage||''});if(out.length>=30)break}
+  if(!out.length)throw new Error('gdelt vide');return out}
+async function loadNews(force){if(newsLoading)return;newsLoading=true;splace.textContent='Collecte des actualités mondiales…';splace.hidden=false;
+  try{let items=force?null:newsCache(),from='cache';
+    if(!items){try{items=await newsFromClaude();from='claude'}catch(e){items=await newsFromGdelt();from='gdelt'}try{localStorage.setItem(NKEY,JSON.stringify({t:Date.now(),items}))}catch(e){}}
+    NEWS=items;buildNewsPoints();splace.textContent=`Actus du jour · ${NEWS.length} pays`;say(`${NEWS.length} pays avec des informations du jour, Monsieur. Touchez un point rouge, ou dites : info suivante.`)}
+  catch(e){splace.textContent='Actus indisponibles';say(findKey()?"Je n'arrive pas à récupérer les actualités, Monsieur.":"Pour les actualités, j'ai besoin de votre clé Claude, Monsieur.")}
+  finally{newsLoading=false;setTimeout(()=>{if(!streetOn&&!newsSel)splace.hidden=true},4000)}}
+function buildNewsPoints(){if(!G)return;if(newsGrp){G.group.remove(newsGrp);labelsEl.querySelectorAll('.lbl.nw').forEach(l=>l.remove())}
+  newsGrp=new T.Group();const add=T.AdditiveBlending;
+  const dotM=new T.MeshBasicMaterial({color:0xff2a3d,transparent:true,opacity:.95,blending:add,depthWrite:false});
+  NEWS.forEach((n,i)=>{const g=new T.Group(),p=vec(n.lo,n.la,1.004);g.position.set(...p);g.lookAt(0,0,0);
+    const dot=new T.Mesh(new T.CircleGeometry(.009,20),dotM);dot.rotation.y=Math.PI;g.add(dot);
+    const ring=new T.Mesh(new T.RingGeometry(.011,.014,32),new T.MeshBasicMaterial({color:0xff2a3d,transparent:true,opacity:.8,blending:add,depthWrite:false,side:T.DoubleSide}));g.add(ring);
+    const glow=new T.Mesh(new T.CircleGeometry(.03,24),new T.MeshBasicMaterial({color:0xff1030,transparent:true,opacity:.18,blending:add,depthWrite:false,side:T.DoubleSide}));g.add(glow);
+    n.ring=ring;n.ph=i*.37;n.v=new T.Vector3(...p);newsGrp.add(g);
+    const d=document.createElement('div');d.className='lbl nw';d.textContent='● '+(n.c||'');d.hidden=true;labelsEl.appendChild(d);n.el=d});
+  G.group.add(newsGrp);newsOn=true}
+function newsFrame(t){if(!newsOn||!newsGrp)return;const ts=t/1000,w=new T.Vector3();if(newsSel&&angDist(view.lat,view.lon,newsSel.la,newsSel.lo)>28)hideNews();
+  NEWS.forEach(n=>{const k=((ts*.6+n.ph)%1);n.ring.scale.setScalar(1+k*2.6);n.ring.material.opacity=.85*(1-k)*(n===newsSel?1.4:1);
+    w.copy(n.v).applyMatrix4(G.group.matrixWorld);if(w.z<.2){n.el.hidden=true;n.sx=null;return}w.project(G.camera);const sx=(w.x+1)/2*W,sy=(1-w.y)/2*H;n.sx=sx;n.sy=sy;
+    n.el.hidden=!(zEff>.15||n===newsSel);n.el.style.transform=`translate(${sx+8}px,${sy-6}px)`})}
+function showNews(n,speak=true){newsSel=n;cardCap=null;$('ck').textContent='Actu du jour · '+n.c;$('cn').textContent=n.title;$('cd').textContent=n.sum;
+  const l=$('clink');if(n.url){l.href=n.url;l.hidden=false}else l.hidden=true;cimg.hidden=true;if(n.img){cimg.onload=()=>{if(newsSel===n)cimg.hidden=false};cimg.src=n.img}
+  card.classList.add('show');splace.hidden=true;if(speak)say(`${n.c}. ${n.title}`)}
+function hideNews(){if(!newsSel)return;newsSel=null;$('clink').hidden=true;card.classList.remove('show')}
+function goNews(n){tv.lon=n.lo;tv.lat=n.la;z=Math.max(z,.55);lastInput=performance.now();showNews(n)}
+function stepNews(d){if(!NEWS.length)return;const i=newsSel?NEWS.indexOf(newsSel):-1;goNews(NEWS[(i+d+NEWS.length)%NEWS.length])}
+async function openNews(force){if(mode!=='map')await openMap();if(!G)return;if(streetOn)closeStreet();loadNews(force)}
+function closeNews(){hideNews();newsOn=false;if(newsGrp){G.group.remove(newsGrp);newsGrp=null}labelsEl.querySelectorAll('.lbl.nw').forEach(l=>l.remove());NEWS=[]}
+
 // ───────── toucher
 const ptrs=new Map();let downT=0,pz=null,downAt=null,moved=false,lastTap=0,lpT=null;
 const pos=e=>({x:e.clientX,y:e.clientY});
@@ -816,7 +872,9 @@ app.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const o=
 const up=e=>{if(!ptrs.has(e.pointerId))return;ptrs.delete(e.pointerId);if(ptrs.size<2)pz=null;
   if(mode==='body'&&moved&&downAt&&ptrs.size===0&&performance.now()-downT<380&&Math.abs(e.clientX-downAt.x)>70&&Math.abs(e.clientX-downAt.x)>Math.abs(e.clientY-downAt.y)*1.5){switchHolo(e.clientX<downAt.x?1:-1);return}
   if(moved||e.type==='pointercancel')return;
-  const p=pos(e),n=performance.now();if(n-lastTap<300&&(mode==='map'||mode==='body')){lastTap=0;if(mode==='map')resetView();else{byaw=0;bz=0;btilt=0}return}lastTap=n;
+  const p=pos(e),n=performance.now();
+  if(mode==='map'&&newsOn&&!streetOn){let best=null,bd=30;for(const q of NEWS){if(q.sx==null)continue;const d=Math.hypot(q.sx-p.x,q.sy-p.y);if(d<bd){bd=d;best=q}}if(best){goNews(best);lastTap=0;return}if(newsSel){hideNews()}}
+  if(n-lastTap<300&&(mode==='map'||mode==='body')){lastTap=0;if(mode==='map')resetView();else{byaw=0;bz=0;btilt=0}return}lastTap=n;
   if(STT.ctx&&STT.ctx.state!=='running'){STT.ctx.resume().then(()=>{needTap=false;setConvo();showHeard('🎙 À l\'écoute…',false)})}
   if(!started){start();return}if(!camOn)startCam();if(needTap||(!micOn&&!userMicOff&&SR)){needTap=false;micOn=true;setConvo();recStart();return}const o=orbPos();if(Math.hypot(p.x-o.x,p.y-o.y)<110*o.k)micToggle()};
 app.addEventListener('pointerup',up);app.addEventListener('pointercancel',up);
