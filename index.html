@@ -839,16 +839,39 @@ async function newsFromClaude(){const key=findKey();if(!key)throw new Error('nok
   if(!r.ok)throw new Error('claude '+r.status);const j=await r.json(),txt=(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
   const a=txt.indexOf('['),b=txt.lastIndexOf(']');const arr=JSON.parse(txt.slice(a,b+1));
   return arr.filter(x=>x&&isFinite(x.lat)&&isFinite(x.lon)&&x.titre).map(x=>({c:x.pays||'',la:+x.lat,lo:+x.lon,title:x.titre,sum:x.resume||'',url:x.source||''}))}
+
+const EXTRA={'Gaza':['Palestine',31.5,34.47],'West Bank':['Palestine',31.9,35.2],'Palestine':['Palestine',31.9,35.2],'Taiwan':['Taïwan',25.03,121.56],'Syria':['Syrie',33.51,36.29],'Sudan':['Soudan',15.5,32.56],'North Korea':['Corée du Nord',39.03,125.75],'Myanmar':['Birmanie',16.87,96.2],'Haiti':['Haïti',18.54,-72.34],'Yemen':['Yémen',15.37,44.19],'Libya':['Libye',32.89,13.19],'Somalia':['Somalie',2.05,45.32],'Mali':['Mali',12.64,-8],'Niger':['Niger',13.51,2.11],'Burkina Faso':['Burkina Faso',12.37,-1.52],'Congo':['RD Congo',-4.32,15.31],'Sri Lanka':['Sri Lanka',6.93,79.86],'Nepal':['Népal',27.71,85.32],'Ecuador':['Équateur',-.18,-78.47],'Bolivia':['Bolivie',-16.5,-68.15],'Romania':['Roumanie',44.43,26.1],'Serbia':['Serbie',44.79,20.45],'Georgia (country)':['Géorgie',41.72,44.79],'Armenia':['Arménie',40.18,44.51],'Azerbaijan':['Azerbaïdjan',40.41,49.87],'Kazakhstan':['Kazakhstan',51.17,71.45],'Cameroon':['Cameroun',3.85,11.5],'Ivory Coast':["Côte d'Ivoire",5.36,-4.01],'Zimbabwe':['Zimbabwe',-17.83,31.05],'Mozambique':['Mozambique',-25.97,32.57],'Uganda':['Ouganda',.35,32.58],'Tanzania':['Tanzanie',-6.16,35.75],'Rwanda':['Rwanda',-1.94,30.06],'Guatemala':['Guatemala',14.63,-90.51],'Honduras':['Honduras',14.07,-87.19],'Panama':['Panama',8.98,-79.52],'Puerto Rico':['Porto Rico',18.47,-66.11],'Jamaica':['Jamaïque',18.02,-76.8],'Iceland':['Islande',64.15,-21.94],'Scotland':['Royaume-Uni',55.95,-3.19],'England':['Royaume-Uni',51.51,-.13],'London':['Royaume-Uni',51.51,-.13],'Paris':['France',48.86,2.35],'Moscow':['Russie',55.76,37.62],'Kharkiv':['Ukraine',49.99,36.23],'Odesa':['Ukraine',46.48,30.72],'Donetsk':['Ukraine',48.02,37.8],'Kherson':['Ukraine',46.64,32.62],'Zaporizhzhia':['Ukraine',47.84,35.14],'Jerusalem':['Israël',31.77,35.21],'Tel Aviv':['Israël',32.08,34.78],'Beirut':['Liban',33.89,35.5],'Damascus':['Syrie',33.51,36.29],'Beijing':['Chine',39.9,116.4],'Kyiv':['Ukraine',50.45,30.52],'Tehran':['Iran',35.69,51.39],'Washington':['États-Unis',38.91,-77.04],'California':['États-Unis',36.78,-119.42],'Texas':['États-Unis',31,-100],'New York':['États-Unis',40.71,-74],'Florida':['États-Unis',27.66,-81.52]};
+const ENFIX={'United States':'États-Unis','U.S.':'États-Unis','American':'États-Unis','British':'Royaume-Uni','French':'France','German':'Allemagne','Russian':'Russie','Chinese':'Chine','Japanese':'Japon','Indian':'Inde','Israeli':'Israël','Iranian':'Iran','Ukrainian':'Ukraine','Turkish':'Turquie','Brazilian':'Brésil','Mexican':'Mexique','Canadian':'Canada','Australian':'Australie','Pakistani':'Pakistan','Nigerian':'Nigeria','Egyptian':'Égypte','Saudi':'Arabie saoudite','South Korean':'Corée du Sud','Spanish':'Espagne','Italian':'Italie','Polish':'Pologne','Argentine':'Argentine','Colombian':'Colombie','Venezuelan':'Venezuela'};
+function placeOf(text){const m=text.match(/\b(?:in|at|near|across|off)\s+((?:[A-Z][\w'’-]+)(?:\s+[A-Z][\w'’-]+)?)/);if(m){const r=placeOf0(m[1]);if(r)return r}return placeOf0(text)}
+function placeOf0(text){let best=null,bi=1e9;
+  for(const[k,v]of Object.entries(EXTRA)){const i=text.indexOf(k);if(i>=0&&i<bi){bi=i;best={c:v[0],la:v[1],lo:v[2]}}}
+  for(const[k,fr]of Object.entries({...EN2FR,...ENFIX})){const i=text.search(new RegExp('\\b'+k.replace('.','\\.')+'\\b'));if(i>=0&&i<bi){const cap=CAPS.find(c=>c.c===fr);if(cap){bi=i;best={c:fr,la:cap.la,lo:cap.lo}}}}
+  return best}
+async function newsFromWiki(){const out=[],seen={},M=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  for(let back=0;back<3&&out.length<25;back++){const d=new Date(Date.now()-back*864e5),page=`Portal:Current_events/${d.getUTCFullYear()}_${M[d.getUTCMonth()]}_${d.getUTCDate()}`;
+    const r=await fetch('https://en.wikipedia.org/w/api.php?action=parse&prop=text&format=json&formatversion=2&origin=*&page='+encodeURIComponent(page));if(!r.ok)continue;const j=await r.json();if(!j.parse)continue;
+    const doc=new DOMParser().parseFromString(j.parse.text,'text/html');
+    for(const li of doc.querySelectorAll('li')){if(li.querySelector('ul'))continue;const txt=li.textContent.replace(/\s*\([^)]*\)\s*$/,'').replace(/\[\d+\]/g,'').trim();if(txt.length<40)continue;
+      const ctx=[...li.parentElement.closest('li')?.childNodes||[]].filter(n=>n.nodeType===1&&n.tagName==='A').map(a=>a.textContent).join(' ');
+      const pl=placeOf(txt)||placeOf(ctx);if(!pl||seen[pl.c])continue;seen[pl.c]=1;
+      const ext=[...li.querySelectorAll('a.external')].map(a=>a.href).pop()||'';
+      out.push({c:pl.c,la:pl.la,lo:pl.lo,title:txt.length>130?txt.slice(0,127)+'…':txt,sum:(ctx?ctx+' — ':'')+txt+' (source : Wikipédia, en anglais)',url:ext})}}
+  if(!out.length)throw new Error('wiki vide');return out}
 async function newsFromGdelt(){const r=await fetch('https://api.gdeltproject.org/api/v2/doc/doc?query=%28world%20OR%20government%20OR%20president%29%20sourcelang:english&mode=artlist&maxrecords=250&timespan=24h&sort=hybridrel&format=json');
   const j=await r.json(),seen={},out=[];for(const a of(j.articles||[])){const fr=EN2FR[a.sourcecountry];if(!fr||seen[fr])continue;const cap=CAPS.find(c=>c.c===fr);if(!cap)continue;seen[fr]=1;
     out.push({c:fr,la:cap.la,lo:cap.lo,title:a.title,sum:'Source : '+a.domain+' (article en anglais).',url:a.url,img:a.socialimage||''});if(out.length>=30)break}
   if(!out.length)throw new Error('gdelt vide');return out}
 async function loadNews(force,quiet){if(newsLoading)return;newsLoading=true;splace.textContent='Collecte des actualités mondiales…';splace.hidden=false;
   try{let items=force?null:newsCache(),from='cache';
-    if(!items){try{items=await newsFromClaude();from='claude'}catch(e){items=await newsFromGdelt();from='gdelt'}try{localStorage.setItem(NKEY,JSON.stringify({t:Date.now(),items}))}catch(e){}}
+    if(!items){const errs=[];
+      if(findKey()){try{items=await newsFromClaude();from='claude'}catch(e){errs.push('Claude : '+(e.message==='claude 401'?'clé refusée':e.message==='claude 400'?'crédit épuisé ou requête refusée':e.message))}}else errs.push('pas de clé Claude');
+      if(!items){try{items=await newsFromWiki();from='wiki'}catch(e){errs.push('Wikipédia : '+e.message)}}
+      if(!items){try{items=await newsFromGdelt();from='gdelt'}catch(e){errs.push('GDELT : '+e.message)}}
+      if(!items)throw new Error(errs.join(' · '))}
+    if(from!=='cache')try{localStorage.setItem(NKEY,JSON.stringify({t:Date.now(),items}))}catch(e){}
     NEWS=items;buildNewsPoints();splace.textContent=`Actus du jour · ${NEWS.length} pays`;if(!quiet)say(`${NEWS.length} pays avec des informations du jour, Monsieur. Touchez un point rouge, ou dites : info suivante.`)}
-  catch(e){splace.textContent='Actus indisponibles';if(!quiet)say(findKey()?"Je n'arrive pas à récupérer les actualités, Monsieur.":"Pour les actualités, j'ai besoin de votre clé Claude, Monsieur.")}
-  finally{newsLoading=false;setTimeout(()=>{if(!streetOn&&!newsSel)splace.hidden=true},4000)}}
+  catch(e){splace.textContent='Actus indisponibles';showHeard('⚠ Actus : '+e.message,true);if(!quiet)say(findKey()?"Je n'arrive pas à récupérer les actualités, Monsieur.":"Pour les actualités, j'ai besoin de votre clé Claude, Monsieur.")}
+  finally{newsLoading=false;setTimeout(()=>{if(!streetOn&&!newsSel)splace.hidden=true},6000)}}
 function buildNewsPoints(){if(!G)return;if(newsGrp){G.group.remove(newsGrp);labelsEl.querySelectorAll('.lbl.nw').forEach(l=>l.remove())}
   newsGrp=new T.Group();const add=T.AdditiveBlending;
   const dotM=new T.MeshBasicMaterial({color:0xff2a3d,transparent:true,opacity:.95,blending:add,depthWrite:false});
