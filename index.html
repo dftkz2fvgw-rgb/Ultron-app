@@ -451,16 +451,16 @@ async function initGlobe(){if(G)return true;if(!await loadThree())return false;
 const dDef=()=>1/Math.sin(Math.atan(Math.tan(20*R)*(W/H)*.9));const D_MIN=1.12;
 function resetView(){tv.lon=2;tv.lat=22;z=0;lastInput=performance.now();hideCard()}
 function goCap(c){if(mode!=='map')openMap();tv.lon=c.lo;tv.lat=c.la;z=.92;lastInput=performance.now()}
-async function openMap(){if(mode==='map')return;if(journalOpen){journalOpen=false;jEl.classList.remove('show');jEl.hidden=true;mode='idle'}if(mode==='body')instantCloseBody();if(!await initGlobe())return;const p=orbPos();mode='map';resetView();view.lon=tv.lon;view.lat=tv.lat;zEff=0;reveal={t0:performance.now(),d:reduce?1:1500,x:p.x,y:p.y,dir:1};place();HG.pd=0}
+async function openMap(){if(mode==='map')return;if(journalOpen){journalOpen=false;jEl.classList.remove('show');jEl.hidden=true;mode='idle'}if(mode==='body')instantCloseBody();if(!await initGlobe())return;const p=orbPos();mode='map';resetView();view.lon=tv.lon;view.lat=tv.lat;zEff=0;reveal={t0:performance.now(),d:reduce?1:1500,x:p.x,y:p.y,dir:1};place();HG.pd=0;setTimeout(()=>{if(mode==='map'&&!newsOn)loadNews(false,true)},1700)}
 function closeMap(){if(mode!=='map')return;closeStreet();closeNews();hideCard();const p=orbPos();reveal={t0:performance.now(),d:reduce?1:900,x:p.x,y:p.y,dir:-1};mode='closing'}
 function renderGlobe(t){if(!G)return;
   if(reveal){const k=Math.min(1,(t-reveal.t0)/reveal.d),e=reveal.dir>0?1-Math.pow(1-k,3):1-k*k*k,r=e*Math.hypot(W,H);globeEl.style.clipPath=`circle(${r}px at ${reveal.x}px ${reveal.y}px)`;
     if(k>=1){if(reveal.dir<0){mode='idle';place();labelsEl.querySelectorAll('.lbl').forEach(l=>l.hidden=true)}else globeEl.style.clipPath='none';reveal=null}}
   if(mode==='idle')return;
-  tv.lon+=spinV;spinV*=.92;if(Math.abs(spinV)<.01)spinV=0;
+  if(!HG.grab){tv.lon+=spinV;tv.lat=Math.max(-75,Math.min(75,tv.lat+spinLat))}spinV*=.93;spinLat*=.9;if(Math.abs(spinV)<.01)spinV=0;if(Math.abs(spinLat)<.01)spinLat=0;
   if(mode==='map'&&z<.05&&t-lastInput>2500&&!reduce)tv.lon+=.035;
   tv.lat=Math.max(-75,Math.min(75,tv.lat));
-  let dl=((tv.lon-view.lon+540)%360)-180;view.lon+=dl*.14;view.lat+=(tv.lat-view.lat)*.14;zEff+=(z-zEff)*.1;
+  let dl=((tv.lon-view.lon+540)%360)-180;view.lon+=dl*.22;view.lat+=(tv.lat-view.lat)*.22;zEff+=(z-zEff)*.16;
   const v0=vec(view.lon,0);G.group.rotation.set(view.lat*R,Math.atan2(-v0[0],v0[2]),0);
   if(mode==='map'&&!streetOn&&z>=1&&zEff>.97&&!G.streetT){G.streetT=1;openStreet(view.lat,view.lon,6.2,null,'Vue des rues').finally(()=>{G.streetT=0})}
   const dd=dDef(),dist=1+(dd-1)*Math.pow((D_MIN-1)/(dd-1),zEff);G.camera.position.set(0,0,dist);G.camera.lookAt(0,0,0);
@@ -496,30 +496,43 @@ const ext=(l,m,p,d,t)=>cosAng(V2(l[m],l[p]),V2(l[p],l[t]))>.55&&cosAng(V2(l[m],l
 function poseOf(l){const ix=ext(l,5,6,7,8),md=ext(l,9,10,11,12),rg=ext(l,13,14,15,16),pk=ext(l,17,18,19,20),n=ix+md+rg+pk;
   if(n>=4)return'open';if(n===0)return'fist';if(ix&&!md&&!rg&&!pk)return'pinch';if(n===3&&!pk)return'open';return'other'}
 function onHands(l){const now=performance.now();
-  if(!l){HG.palm=null;HG.pose='none';HG.candN=0;HG.openSince=0;return}
+  if(!l){if(HG.palm)endGrab();HG.palm=null;HG.pose='none';HG.lastPose='none';HG.candN=0;HG.openSince=0;FX_.reset();FY_.reset();return}
   const size=Math.hypot(l[0].x-l[9].x,l[0].y-l[9].y)||1e-3;
   // pose stabilisée (3 images identiques de suite)
   const p=poseOf(l);if(p===HG.cand)HG.candN++;else{HG.cand=p;HG.candN=1}
   if(HG.candN>=3&&p!==HG.pose){HG.pose=p;HG.since=now;HG.fistDone=false;HG.pd=0;HG.openSince=0}
-  // paume lissée
+  // paume filtrée (filtre « One Euro » : très stable à l'arrêt, réactif quand on bouge vite)
   const raw={x:1-(l[0].x+l[5].x+l[17].x)/3,y:(l[0].y+l[5].y+l[17].y)/3};
-  const prev=HG.palm;HG.palm=prev?{x:prev.x+(raw.x-prev.x)*.5,y:prev.y+(raw.y-prev.y)*.5}:raw;
+  const prev=HG.palm;HG.palm={x:FX_.f(raw.x,now),y:FY_.f(raw.y,now)};
   const dx=prev?HG.palm.x-prev.x:0,dy=prev?HG.palm.y-prev.y:0,sp=Math.hypot(dx,dy);
   if(mode==='map'||mode==='body')lastInput=now;
-  const pose=HG.pose;
+  const pose=HG.pose;if(pose!==HG.lastPose){endGrab(now);HG.lastPose=pose}
   // ✊ poing : retour à l'origine
   if(pose==='fist'){if(!HG.fistDone&&now-HG.since>500){HG.fistDone=true;
-      if(mode==='map'){closeStreet();resetView();spinV=0}if(mode==='body'){byaw=0;bz=0;btilt=0;byawV=0}orbKt=1;orbTilt=0;orbVel=0}return}
-  // 🤏 pince : écarter = agrandir, rapprocher = rétrécir (la taille reste quand on lâche)
-  if(pose==='pinch'){const pd=Math.hypot(l[4].x-l[8].x,l[4].y-l[8].y)/size;
-    if(HG.pd>0){const f=pd/HG.pd;if(Math.abs(f-1)>.015){const k=Math.log(f);
-      if(mode==='map'&&streetOn&&SM)SM.setZoom(Math.max(3,Math.min(19,SM.getZoom()+k*3.2)),{animate:false});else if(mode==='map')z=Math.max(0,Math.min(1,z+k*.9));else if(mode==='body')bz=Math.max(0,Math.min(1,bz+k*.9));else if(mode==='idle')orbKt=Math.max(.5,Math.min(1.8,orbKt*Math.exp(k*1.1)))}}
-    HG.pd=HG.pd?HG.pd+(pd-HG.pd)*.6:pd;return}
-  // ✋ paume ouverte : rotation dans le sens de la main
+      if(mode==='map'){closeStreet();resetView();spinV=0;spinLat=0}if(mode==='body'){byaw=0;bz=0;btilt=0;byawV=0}orbKt=1;orbTilt=0;orbVel=0}return}
+  // 🤏 pince : zoom proportionnel à l'écartement depuis le début du geste (aucune dérive)
+  if(pose==='pinch'){const pd=FP_.f(Math.hypot(l[4].x-l[8].x,l[4].y-l[8].y)/size,now);
+    if(!HG.pz){HG.pz={pd0:pd,z0:z,b0:bz,k0:orbKt,s0:streetOn&&SM?SM.getZoom():0}}
+    const k=Math.log(pd/HG.pz.pd0),kk=Math.abs(k)<.04?0:k-Math.sign(k)*.04;
+    if(mode==='map'&&streetOn&&SM)SM.setZoom(Math.max(3,Math.min(19,HG.pz.s0+kk*3.4)),{animate:false});
+    else if(mode==='map')z=Math.max(0,Math.min(1,HG.pz.z0+kk*.95));
+    else if(mode==='body')bz=Math.max(0,Math.min(1,HG.pz.b0+kk*.95));
+    else if(mode==='idle')orbKt=Math.max(.5,Math.min(1.8,HG.pz.k0*Math.exp(kk*1.1)));return}
+  // ✋ paume ouverte : on « attrape » la carte et elle suit la main
   if(pose==='open'){
+    if(mode==='map'&&!streetOn){
+      if(!HG.grab){HG.grab={px:HG.palm.x,py:HG.palm.y,lon:tv.lon,lat:tv.lat,lt:now,vl:0,va:0};spinV=0;spinLat=0}
+      const g=HG.grab,gain=1/(1+zEff*7),nl=g.lon-(HG.palm.x-g.px)*230*gain,na=Math.max(-75,Math.min(75,g.lat+(HG.palm.y-g.py)*150*gain));
+      const dt=Math.max(8,now-g.lt);g.vl=g.vl*.6+(nl-tv.lon)/dt*16.7*.4;g.va=g.va*.6+(na-tv.lat)/dt*16.7*.4;g.lt=now;tv.lon=nl;tv.lat=na;
+      orbAng+=dx*6;orbVel=dx*3;return}
+    if(mode==='map'&&streetOn&&SM){if(sp>.0015)SM.panBy([-dx*W*1.7,-dy*H*1.4],{animate:false});return}
     if(sp>.004){orbAng+=dx*6;orbVel=dx*3;orbTilt=Math.max(-1.2,Math.min(1.2,orbTilt+dy*4));HG.openSince=0;
-      if(mode==='map'&&streetOn&&SM)SM.panBy([-dx*W*1.6,-dy*H*1.3],{animate:false});else if(mode==='map'){const g=1+zEff*7;tv.lon-=dx*240/g;tv.lat+=dy*160/g;spinV=-dx*120/g}if(mode==='body'){if(Math.abs(dx)>.045&&now>(HG.swipeCool||0)){HG.swipeCool=now+800;switchHolo(dx<0?1:-1)}else{byaw+=dx*9;byawV=dx*3;btilt=Math.max(-1,Math.min(1,btilt+dy*3))}}}
+      if(mode==='body'){if(Math.abs(dx)>.045&&now>(HG.swipeCool||0)){HG.swipeCool=now+800;switchHolo(dx<0?1:-1)}else{byaw+=dx*9;byawV=dx*3;btilt=Math.max(-1,Math.min(1,btilt+dy*3))}}}
 }}
+// fin d'un geste : la carte garde son élan
+function endGrab(){if(HG.grab){spinV=Math.max(-3,Math.min(3,HG.grab.vl||0));spinLat=Math.max(-2,Math.min(2,HG.grab.va||0));HG.grab=null}HG.pz=null;FP_.reset()}
+function OE(minC,beta){let x=null,d=0,t0=0;const a=(c,dt)=>{const r=2*Math.PI*c*dt;return r/(r+1)};return{f(v,t){if(x===null){x=v;t0=t;return v}const dt=Math.max(.001,(t-t0)/1000);t0=t;const ed=(v-x)/dt;d+=a(1,dt)*(ed-d);x+=a(minC+beta*Math.abs(d),dt)*(v-x);return x},reset(){x=null;d=0}}}
+const FX_=OE(1.1,9),FY_=OE(1.1,9),FP_=OE(1.4,3);let spinLat=0;
 let camOn=false,camStream=null,handsInit=false;
 async function startCam(){if(camOn)return;const v=$('cam'),st=$('camst');st.hidden=false;st.textContent='Caméra…';
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){st.textContent='Ouvre dans Safari';return}
@@ -830,11 +843,11 @@ async function newsFromGdelt(){const r=await fetch('https://api.gdeltproject.org
   const j=await r.json(),seen={},out=[];for(const a of(j.articles||[])){const fr=EN2FR[a.sourcecountry];if(!fr||seen[fr])continue;const cap=CAPS.find(c=>c.c===fr);if(!cap)continue;seen[fr]=1;
     out.push({c:fr,la:cap.la,lo:cap.lo,title:a.title,sum:'Source : '+a.domain+' (article en anglais).',url:a.url,img:a.socialimage||''});if(out.length>=30)break}
   if(!out.length)throw new Error('gdelt vide');return out}
-async function loadNews(force){if(newsLoading)return;newsLoading=true;splace.textContent='Collecte des actualités mondiales…';splace.hidden=false;
+async function loadNews(force,quiet){if(newsLoading)return;newsLoading=true;splace.textContent='Collecte des actualités mondiales…';splace.hidden=false;
   try{let items=force?null:newsCache(),from='cache';
     if(!items){try{items=await newsFromClaude();from='claude'}catch(e){items=await newsFromGdelt();from='gdelt'}try{localStorage.setItem(NKEY,JSON.stringify({t:Date.now(),items}))}catch(e){}}
-    NEWS=items;buildNewsPoints();splace.textContent=`Actus du jour · ${NEWS.length} pays`;say(`${NEWS.length} pays avec des informations du jour, Monsieur. Touchez un point rouge, ou dites : info suivante.`)}
-  catch(e){splace.textContent='Actus indisponibles';say(findKey()?"Je n'arrive pas à récupérer les actualités, Monsieur.":"Pour les actualités, j'ai besoin de votre clé Claude, Monsieur.")}
+    NEWS=items;buildNewsPoints();splace.textContent=`Actus du jour · ${NEWS.length} pays`;if(!quiet)say(`${NEWS.length} pays avec des informations du jour, Monsieur. Touchez un point rouge, ou dites : info suivante.`)}
+  catch(e){splace.textContent='Actus indisponibles';if(!quiet)say(findKey()?"Je n'arrive pas à récupérer les actualités, Monsieur.":"Pour les actualités, j'ai besoin de votre clé Claude, Monsieur.")}
   finally{newsLoading=false;setTimeout(()=>{if(!streetOn&&!newsSel)splace.hidden=true},4000)}}
 function buildNewsPoints(){if(!G)return;if(newsGrp){G.group.remove(newsGrp);labelsEl.querySelectorAll('.lbl.nw').forEach(l=>l.remove())}
   newsGrp=new T.Group();const add=T.AdditiveBlending;
